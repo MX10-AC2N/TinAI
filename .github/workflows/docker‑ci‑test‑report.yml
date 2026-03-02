@@ -1,14 +1,12 @@
-name: CI – TinAI Deploy & Test
+name: CI – TinAI v2 Deploy & Test
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: write
 
@@ -17,69 +15,104 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # OpenFang n'a pas d'image publiée → build depuis le source
-      - name: Build OpenFang image
-        run: |
-          git clone --depth=1 https://github.com/RightNow-AI/openfang.git /tmp/openfang
-          docker build -t tinai-openfang:latest /tmp/openfang
-          echo "✅ tinai-openfang:latest buildée"
+      # Cache de l'image OpenFang pour éviter de recompiler Rust à chaque run
+      - name: Cache OpenFang Docker layer
+        uses: actions/cache@v4
+        with:
+          path: /tmp/openfang-image.tar
+          key: openfang-${{ hashFiles('**/openfang-version.txt') }}-v1
+          restore-keys: openfang-
 
-      # Générer le docker-compose.yml via install.sh en mode CI
-      - name: Generate docker-compose.yml
+      - name: Build or restore OpenFang image
+        run: |
+          if [ -f /tmp/openfang-image.tar ]; then
+            echo "♻️  Restauration de l'image OpenFang depuis le cache..."
+            docker load -i /tmp/openfang-image.tar
+          else
+            echo "🔨 Compilation OpenFang depuis le source (Rust)..."
+            git clone --depth=1 https://github.com/RightNow-AI/openfang.git /tmp/openfang
+            # Sauvegarder la version pour invalider le cache si besoin
+            git -C /tmp/openfang rev-parse HEAD > openfang-version.txt
+            docker build -t tinai-openfang:latest /tmp/openfang
+            docker save tinai-openfang:latest -o /tmp/openfang-image.tar
+            echo "✅ Image buildée et mise en cache"
+          fi
+
+      # Générer le docker-compose.yml via install.sh
+      - name: Generate docker-compose.yml (CI mode)
         run: |
           chmod +x install.sh
           CI=true ./install.sh
           echo "── docker-compose.yml généré ──"
           cat TinAI/docker-compose.yml
 
+      # Installer le CLI tinai
+      - name: Install tinai CLI
+        run: |
+          chmod +x tinai
+          sudo cp tinai /usr/local/bin/tinai-cli
+          echo "TINAI_DIR=$(pwd)/TinAI" >> $GITHUB_ENV
+          echo "✅ CLI tinai installé"
+
       # Valider la syntaxe YAML
       - name: Validate docker-compose syntax
         run: |
           cd TinAI
           docker compose config > /dev/null
-          echo "✅ Syntaxe valide"
+          echo "✅ Syntaxe docker-compose valide"
 
-      # Vérifier que tous les services sont bien définis
+      # Vérifier que tous les services sont définis
       - name: Check all services defined
         run: |
           cd TinAI
-          for svc in tinai-llama tinai-webui tinai-code tinai-aider tinai-openfang tinai-lancedb tinai-swap tinai-caddy tinai-filebrowser; do
-            grep -q "container_name: $svc" docker-compose.yml \
-              && echo "✅ $svc" \
-              || { echo "❌ $svc MANQUANT"; exit 1; }
+          ALL_OK=true
+          for svc in \
+            tinai-llama tinai-webui tinai-sillytavern tinai-code \
+            tinai-aider tinai-openfang tinai-embeddings tinai-lancedb \
+            tinai-vision tinai-comfyui tinai-swap tinai-caddy tinai-filebrowser
+          do
+            if grep -q "container_name: $svc" docker-compose.yml; then
+              echo "✅ $svc"
+            else
+              echo "❌ $svc MANQUANT"
+              ALL_OK=false
+            fi
           done
+          $ALL_OK || exit 1
 
       # Démarrer tous les services
       - name: Start all services
         run: |
           cd TinAI
           docker compose up -d
+          echo "── État initial ──"
           docker compose ps
 
-      # Attendre que les services répondent
+      # Attendre que les services soient prêts
       - name: Wait for services
         run: |
           wait_for() {
             local name=$1 url=$2 max=${3:-120} i=0
-            printf "⏳ %-35s" "$name"
+            printf "⏳ %-40s" "$name"
             while ! curl -sSf --max-time 5 "$url" >/dev/null 2>&1; do
               sleep 5; i=$((i+5))
-              if [ $i -ge $max ]; then
-                echo "⚠️  timeout ${max}s"
-                return 1
-              fi
+              if [ $i -ge $max ]; then echo "⚠️  timeout ${max}s"; return 1; fi
             done
-            echo "✅ up en ${i}s"
+            echo "✅ ${i}s"
           }
-          wait_for "Open-WebUI   (3000)" "http://127.0.0.1:3000/"       120 || true
-          wait_for "Code-Server  (8080)" "http://127.0.0.1:8080/"       120 || true
-          wait_for "OpenFang     (4200)" "http://127.0.0.1:4200/"       120 || true
-          wait_for "LanceDB      (8082)" "http://127.0.0.1:8082/health"  90 || true
-          wait_for "llama-swap   (11434)" "http://127.0.0.1:11434/health" 90 || true
-          wait_for "Caddy        (80)"   "http://127.0.0.1:80/"          60 || true
-          wait_for "Filebrowser  (8083)" "http://127.0.0.1:8083/"        60 || true
+          wait_for "Open-WebUI   (3000)"  "http://127.0.0.1:3000/"        120 || true
+          wait_for "SillyTavern  (8008)"  "http://127.0.0.1:8008/"        120 || true
+          wait_for "Code-Server  (8080)"  "http://127.0.0.1:8080/"        120 || true
+          wait_for "OpenFang     (4200)"  "http://127.0.0.1:4200/"        120 || true
+          wait_for "Embeddings   (8084)"  "http://127.0.0.1:8084/health"   90 || true
+          wait_for "LanceDB      (8082)"  "http://127.0.0.1:8082/health"   90 || true
+          wait_for "Vision       (8085)"  "http://127.0.0.1:8085/health"  120 || true
+          wait_for "ComfyUI      (7860)"  "http://127.0.0.1:7860/"        120 || true
+          wait_for "llama-swap   (11434)" "http://127.0.0.1:11434/health"  90 || true
+          wait_for "Caddy        (80)"    "http://127.0.0.1:80/"           60 || true
+          wait_for "Filebrowser  (8083)"  "http://127.0.0.1:8083/"         60 || true
 
-      # Tests fonctionnels + génération du rapport
+      # Tests fonctionnels
       - name: Run functional tests
         id: tests
         run: |
@@ -97,15 +130,18 @@ jobs:
           }
 
           check "Open-WebUI (3000)"    "http://127.0.0.1:3000/"
+          check "SillyTavern (8008)"   "http://127.0.0.1:8008/"
           check "Code-Server (8080)"   "http://127.0.0.1:8080/"
           check "OpenFang (4200)"      "http://127.0.0.1:4200/"
+          check "Embeddings (8084)"    "http://127.0.0.1:8084/health"
           check "LanceDB (8082)"       "http://127.0.0.1:8082/health"
+          check "Vision VL (8085)"     "http://127.0.0.1:8085/health"
+          check "ComfyUI (7860)"       "http://127.0.0.1:7860/"
           check "llama-swap (11434)"   "http://127.0.0.1:11434/health"
           check "Caddy (80)"           "http://127.0.0.1:80/"
           check "Filebrowser (8083)"   "http://127.0.0.1:8083/"
 
-          # llama-server : on vérifie que le conteneur tourne
-          # (le modèle 3GB se télécharge au 1er run, pas bloquant pour le test)
+          # llama-server : on vérifie le conteneur (modèle dl au 1er run)
           if docker ps --format '{{.Names}}' | grep -q "tinai-llama"; then
             ROWS+="| llama-server (8081) | ✅ Conteneur actif | modèle en dl au 1er run |\n"
           else
@@ -113,67 +149,71 @@ jobs:
             FAILED=true
           fi
 
-          # État détaillé des conteneurs
+          # Test CLI tinai status
+          TINAI_DIR="$(pwd)/TinAI" tinai status > /tmp/tinai-status.txt 2>&1 && \
+            ROWS+="| CLI tinai status | ✅ OK | - |\n" || \
+            ROWS+="| CLI tinai status | ❌ FAIL | voir logs |\n"
+
           CONTAINERS=$(cd TinAI && docker compose ps 2>&1)
 
           cat > TEST-REPORT.md << REPORT
-          ## 🧪 TinAI – Test Report
+          ## 🧪 TinAI v2 – Test Report
 
           **Date :** $(date -u +"%Y-%m-%d %H:%M UTC")
           **Run :** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           **Commit :** \`${{ github.sha }}\`
           **Branch :** \`${{ github.ref_name }}\`
 
-          ### Résultats des tests
+          ### ✅ Résultats des tests
 
           | Service | Statut | Endpoint |
           |---------|--------|----------|
           $(echo -e "$ROWS")
 
-          ### État des conteneurs
+          ### 🐳 État des conteneurs
 
           \`\`\`
           $CONTAINERS
           \`\`\`
 
-          ### Notes
-          - llama-server télécharge Qwen2.5-Coder-3B (~3 GB) au premier démarrage
-          - OpenFang buildé depuis [RightNow-AI/openfang](https://github.com/RightNow-AI/openfang)
-          - llama-swap utilise l'image officielle \`ghcr.io/mostlygeek/llama-swap:cpu\`
+          ### 📋 tinai status output
+
+          \`\`\`
+          $(cat /tmp/tinai-status.txt)
+          \`\`\`
+
+          ### 📝 Notes
+          - **llama-server** télécharge le modèle Qwen2.5-Coder-3B (~3 GB) au 1er démarrage
+          - **OpenFang** buildé depuis source [RightNow-AI/openfang](https://github.com/RightNow-AI/openfang) (image cachée entre les runs)
+          - **llama-swap** image officielle \`ghcr.io/mostlygeek/llama-swap:cpu\`
+          - **Embeddings** nomic-embed-text-v1.5 (~300 MB)
+          - **Vision** Qwen2.5-VL-3B (~2.5 GB)
           REPORT
 
           cat TEST-REPORT.md
 
-          if $FAILED; then
-            echo "failed=true"  >> $GITHUB_OUTPUT
-          else
-            echo "failed=false" >> $GITHUB_OUTPUT
-          fi
+          $FAILED && echo "failed=true" >> $GITHUB_OUTPUT || echo "failed=false" >> $GITHUB_OUTPUT
 
-      # Upload du rapport comme artefact
       - name: Upload TEST-REPORT artifact
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TEST-REPORT
+          name: TEST-REPORT-v2
           path: TEST-REPORT.md
 
-      # Commit du rapport dans le repo
       - name: Commit TEST-REPORT.md
         if: always()
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "🧪 CI #${{ github.run_number }} – TEST-REPORT"
-          file_pattern: TEST-REPORT.md
+          commit_message: "🧪 CI v2 #${{ github.run_number }} – TEST-REPORT"
+          file_pattern: TEST-REPORT.md openfang-version.txt
 
-      # Fail le job si des tests ont échoué
       - name: Fail on test failures
         if: steps.tests.outputs.failed == 'true'
         run: |
           echo "❌ Des tests ont échoué – voir TEST-REPORT.md"
           exit 1
 
-      # Nettoyage
       - name: Teardown
         if: always()
         run: |
