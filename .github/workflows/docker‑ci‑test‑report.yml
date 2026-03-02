@@ -4,14 +4,8 @@ name: CI – Build, Test Docker & Publish TEST‑REPORT
 # Quand le workflow doit‑il s’exécuter ?
 # ------------------------------------------------------------------
 on:
-  push:
-    branches: [ main ]          # à chaque push sur la branche principale
-  pull_request:
-    branches: [ main ]          # et à chaque PR vers main
   workflow_dispatch:           # déclenchement manuel depuis l’onglet Actions
-  schedule:
-    - cron: "0 4 * * *"        # (optionnel) exécution quotidienne à 04 h UTC
-
+  
 # ------------------------------------------------------------------
 # Jobs
 # ------------------------------------------------------------------
