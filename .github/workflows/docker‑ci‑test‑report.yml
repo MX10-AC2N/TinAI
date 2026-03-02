@@ -179,15 +179,3 @@ jobs:
         run: |
           docker compose -f TinAI/docker-compose.yml down --remove-orphans -v
           docker system prune -f
-```
-
----
-
-**Structure finale de ton repo :**
-```
-TinAI/
-├── install.sh
-└── .github/
-    └── workflows/
-        └── ci.yml
-```
