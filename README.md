@@ -1,6 +1,6 @@
 # TinAI 🧠
 
-[![CI – TinAI v2 Deploy & Test](https://github.com/RightNow-AI/TinAI/actions/workflows/ci.yml/badge.svg)](https://github.com/RightNow-AI/TinAI/actions/workflows/ci.yml)
+[![CI – TinAI v2 Deploy & Test](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker%E2%80%91ci%E2%80%91test%E2%80%91report.yml/badge.svg)](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker%E2%80%91ci%E2%80%91test%E2%80%91report.yml)
 [![TEST-REPORT](https://img.shields.io/badge/test--report-voir%20les%20résultats-blue)](./TEST-REPORT.md)
 [![Version](https://img.shields.io/badge/version-2.0.0-green)](https://github.com/RightNow-AI/TinAI/releases)
 [![License](https://img.shields.io/badge/license-MIT-orange)](./LICENSE)
