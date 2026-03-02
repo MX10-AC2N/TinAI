@@ -43,7 +43,7 @@ Code-Server + Continue.dev (VS Code web)
 Aider (pair programming autonome)
 OpenFang (agents autonomes 24/7)
 Embedding dédié – nomic-embed-text (RAG propre)
-LanceDB RAG (mémoire persistante des projets)
+Qdrant RAG (mémoire persistante des projets)
 Multimodal – Qwen2.5-VL (vision + texte)
 ComfyUI (génération d'images locale)
 llama-swap (switch modèles à chaud)
@@ -65,10 +65,9 @@ else
         echo "✅ gum installé"
     fi
 
-    # ── Avertissements RAM ────────────────────────────────────────
     RAM_WARN=""
     if [ "$TOTAL_RAM_MB" -lt 8192 ]; then
-        RAM_WARN=" ⚠️ RAM limitée"
+        RAM_WARN=" ⚠️  RAM limitée"
     fi
 
     echo ""
@@ -84,7 +83,7 @@ else
         "Aider (pair programming autonome)" \
         "OpenFang (agents autonomes 24/7)" \
         "Embedding dédié – nomic-embed-text (RAG propre)" \
-        "LanceDB RAG (mémoire persistante des projets)" \
+        "Qdrant RAG (mémoire persistante des projets)" \
         "Multimodal – Qwen2.5-VL (vision + texte)" \
         "ComfyUI (génération d'images locale)" \
         "llama-swap (switch modèles à chaud)" \
@@ -100,7 +99,6 @@ mkdir -p models projects comfyui/models comfyui/output
 # ════════════════════════════════════════════════════════════════
 
 cat > docker-compose.yml << 'EOF'
-version: '3.8'
 services:
 EOF
 
@@ -163,11 +161,6 @@ cat >> docker-compose.yml << 'SILLY'
     volumes:
       - sillytavern-data:/home/node/app/data
       - sillytavern-config:/home/node/app/config
-    environment:
-      - OPENAI_API_BASE_URL=http://llama-server:8081/v1
-    depends_on:
-      llama-server:
-        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
@@ -269,22 +262,22 @@ cat >> docker-compose.yml << 'EMBED'
 EMBED
 fi
 
-# ── LanceDB ───────────────────────────────────────────────────────
-if echo "$CHOICES" | grep -q "LanceDB"; then
-cat >> docker-compose.yml << 'LANCEDB'
-  lancedb:
-    image: lancedb/lancedb:latest
-    container_name: tinai-lancedb
-    ports: ["8082:8082"]
-    volumes: ["lancedb-data:/data"]
+# ── Qdrant ────────────────────────────────────────────────────────
+if echo "$CHOICES" | grep -q "Qdrant"; then
+cat >> docker-compose.yml << 'QDRANT'
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: tinai-qdrant
+    ports: ["6333:6333", "6334:6334"]
+    volumes: ["qdrant-data:/qdrant/storage"]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 15s
-LANCEDB
+QDRANT
 fi
 
 # ── Multimodal – Qwen2.5-VL ──────────────────────────────────────
@@ -436,7 +429,7 @@ volumes:
   sillytavern-data:
   sillytavern-config:
   code-data:
-  lancedb-data:
+  qdrant-data:
   caddy-data:
   filebrowser-db:
 VOLUMES
@@ -444,14 +437,14 @@ VOLUMES
 echo ""
 echo "✅ docker-compose.yml généré avec succès !"
 
-# ── Installation du CLI tinai ─────────────────────────────────────
-TINAI_DIR="$(pwd)"
-sudo tee /usr/local/bin/tinai > /dev/null << CLISCRIPT
-#!/bin/bash
-COMPOSE_DIR="$TINAI_DIR"
-exec /usr/local/bin/tinai-cli "\$@"
-CLISCRIPT
-sudo chmod +x /usr/local/bin/tinai
+# ── Copie du CLI tinai ────────────────────────────────────────────
+if [ -f "../tinai" ]; then
+    sudo cp ../tinai /usr/local/bin/tinai
+    sudo chmod +x /usr/local/bin/tinai
+    # Injecter le bon chemin dans le CLI
+    sudo sed -i "s|TINAI_DIR_PLACEHOLDER|$(pwd)|g" /usr/local/bin/tinai
+    echo "✅ CLI tinai installé → tinai help"
+fi
 
 # ── Lancement (pas en CI) ─────────────────────────────────────────
 if [ "${CI:-}" != "true" ]; then
@@ -470,9 +463,11 @@ if [ "${CI:-}" != "true" ]; then
     echo "║  Filebrowser   → http://IP:8083              ║"
     echo "║  llama-server  → http://IP:8081              ║"
     echo "║  Embeddings    → http://IP:8084              ║"
-    echo "║  Vision        → http://IP:8085              ║"
+    echo "║  Vision VL     → http://IP:8085              ║"
+    echo "║  Qdrant        → http://IP:6333              ║"
     echo "║  llama-swap    → http://IP:11434             ║"
     echo "╠══════════════════════════════════════════════╣"
     echo "║  CLI : tinai status / logs / update / model  ║"
     echo "╚══════════════════════════════════════════════╝"
 fi
+
