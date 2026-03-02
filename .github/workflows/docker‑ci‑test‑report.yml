@@ -1,4 +1,4 @@
-name: CI • Build Docker • Test • Report
+name: CI – Build, Test Docker & Publish TEST‑REPORT
 
 # ------------------------------------------------------------------
 # Quand le workflow doit‑il s’exécuter ?
@@ -17,142 +17,237 @@ on:
 # ------------------------------------------------------------------
 jobs:
   # --------------------------------------------------------------
-  # 1️⃣ Build, start & test les containers Docker
+  # 1️⃣ Build les images Docker et démarre les services
   # --------------------------------------------------------------
-  build_test:
+  build-and-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30          # éviter les boucles infinies
-    env:
-      # Liste des ports exposés par les services que tu veux tester.
-      # Modifie‑les en fonction de ton docker‑compose.yml.
-      PORT_LLAMA: 8081
-      PORT_WEBUI: 3000
-      PORT_CODE: 8080
-      PORT_FANG: 4200
-      PORT_CADDY: 80
-      PORT_FILEBROWSER: 8083
+    timeout-minutes: 30          # évite les jobs bloqués indéfiniment
+    permissions:
+      contents: write           # nécessaire pour pousser le rapport
+      issues: write             # (facultatif) si tu veux créer une issue en cas d’échec
 
     steps:
       # ------------------------------------------------------------------
-      # 1️⃣ Récupérer le code du dépôt
+      # 0️⃣ Checkout du dépôt (inclut install.sh, docker‑compose.yml, etc.)
       # ------------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
       # ------------------------------------------------------------------
-      # 2️⃣ Installer Docker (déjà présent sur ubuntu‑latest) et Docker‑Compose v2
+      # 1️⃣ Installer Docker (déjà présent sur ubuntu‑latest) et docker‑compose v2
       # ------------------------------------------------------------------
       - name: Install Docker Compose (v2)
         run: |
-          sudo curl -L "https://github.com/docker/compose/releases/download/v2.27.1/docker-compose-linux-x86_64" \
-            -o /usr/local/lib/docker/cli-plugins/docker-compose
-          sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64" \
+            -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
           docker compose version
 
       # ------------------------------------------------------------------
-      # 3️⃣ Construire toutes les images définies dans docker‑compose.yml
+      # 2️⃣ Construire toutes les images définies dans docker‑compose.yml
       # ------------------------------------------------------------------
       - name: Build Docker images
         run: |
           docker compose build --pull
 
       # ------------------------------------------------------------------
-      # 4️⃣ Démarrer les services en mode détaché
+      # 3️⃣ Démarrer les services en mode détaché
       # ------------------------------------------------------------------
       - name: Start services
         run: |
           docker compose up -d
 
       # ------------------------------------------------------------------
-      # 5️⃣ Attendre que les conteneurs soient prêts (simple health‑check)
+      # 4️⃣ Attendre que les conteneurs soient prêts (health‑check loop)
       # ------------------------------------------------------------------
       - name: Wait for services to become healthy
-        timeout-minutes: 5
+        env:
+          MAX_WAIT: 120          # secondes max d’attente
         run: |
-          # fonction d’attente générique
-          wait_port() {
-            local host=$1 port=$2 retries=30
-            for i in $(seq $retries); do
-              if nc -z "$host" "$port" >/dev/null 2>&1; then
-                echo "Port $port is open"
-                return 0
-              fi
-              echo "Waiting for $host:$port … ($i/$retries)"
-              sleep 2
-            done
-            echo "❌ Timeout waiting for $host:$port"
-            return 1
-          }
+          echo "🔎 Attente de la disponibilité des services…"
+          start=$(date +%s)
+          while true; do
+            # 1️⃣ Llama‑server (port 8081) – endpoint /healthz ou /v1/models
+            if curl -sSf http://127.0.0.1:8081/v1/models >/dev/null 2>&1; then
+              echo "✅ llama‑server OK"
+            else
+              echo "⏳ waiting for llama‑server…"
+            fi
 
-          wait_port localhost $PORT_LLAMA
-          wait_port localhost $PORT_WEBUI   || true   # certains services peuvent être désactivés
-          wait_port localhost $PORT_CODE
-          wait_port localhost $PORT_FANG   || true
-          wait_port localhost $PORT_CADDY  || true
-          wait_port localhost $PORT_FILEBROWSER || true
+            # 2️⃣ Open‑WebUI (port 3000) – endpoint /
+            if curl -sSf http://127.0.0.1:3000/ >/dev/null 2>&1; then
+              echo "✅ open‑webui OK"
+            else
+              echo "⏳ waiting for open‑webui…"
+            fi
+
+            # 3️⃣ Code‑Server (port 8080) – endpoint /
+            if curl -sSf http://127.0.0.1:8080/ >/dev/null 2>&1; then
+              echo "✅ code‑server OK"
+            else
+              echo "⏳ waiting for code‑server…"
+            fi
+
+            # 4️⃣ OpenFang (port 4200) – endpoint /
+            if curl -sSf http://127.0.0.1:4200/ >/dev/null 2>&1; then
+              echo "✅ openfang OK"
+            else
+              echo "⏳ waiting for openfang…"
+            fi
+
+            # 5️⃣ LanceDB (port 8082) – endpoint /
+            if curl -sSf http://127.0.0.1:8082/ >/dev/null 2>&1; then
+              echo "✅ lancedb OK"
+            else
+              echo "⏳ waiting for lancedb…"
+            fi
+
+            # 6️⃣ Caddy (port 80) – endpoint /
+            if curl -sSf http://127.0.0.1/ >/dev/null 2>&1; then
+              echo "✅ caddy OK"
+            else
+              echo "⏳ waiting for caddy…"
+            fi
+
+            # Tous les services qui existent dans le compose sont OK ?
+            # (on ignore les services qui ne sont pas présents)
+            ALL_OK=true
+            for svc in llama-server open-webui code-server openfang lancedb caddy; do
+              if docker compose ps $svc | grep -q "Exit"; then
+                ALL_OK=false
+              fi
+            done
+
+            now=$(date +%s)
+            elapsed=$((now-start))
+            if $ALL_OK && [ $elapsed -gt 5 ]; then
+              echo "✅ All reachable services are up after $elapsed s"
+              break
+            fi
+            if [ $elapsed -ge $MAX_WAIT ]; then
+              echo "❌ Timeout after $MAX_WAIT s – some services are still unavailable"
+              break
+            fi
+            sleep 5
+          done
 
       # ------------------------------------------------------------------
-      # 6️⃣ Exécuter les tests (exemple très basique – à enrichir)
+      # 5️⃣ Exécuter les tests fonctionnels (exemple basique)
       # ------------------------------------------------------------------
       - name: Run functional tests
-        id: tests
+        id: functional_tests
         run: |
           set -euo pipefail
 
-          # Helper pour consigner le résultat d’un test
-          log_test() {
-            local name=$1 status=$2 detail=$3
-            echo "- **$name** : $status" >> $GITHUB_OUTPUT
-            echo "$name|$status|$detail" >> test_results.tsv
+          REPORT="## 🧪 Test Report – $(date -u +"%Y-%m-%d %H:%M UTC")\n\n"
+
+          # Helper to append result
+          add_result() {
+            local name="$1"
+            local status="$2"
+            local detail="${3:-}"
+            if [ "$status" = "OK" ]; then
+              REPORT+="* ✅ **$name** – $status\n"
+            else
+              REPORT+="* ❌ **$name** – $status\n"
+              [ -n "$detail" ] && REPORT+="  - Details: $detail\n"
+            fi
           }
 
-          # Nettoyer le fichier de résultats
-          > test_results.tsv
-          echo -e "Test|Status|Detail" > test_results.tsv
-
-          # 1️⃣ Test du serveur Llama (endpoint de santé simple)
-          if curl -sSf "http://localhost:${PORT_LLAMA}/v1/models" >/dev/null; then
-            log_test "Llama‑server health" "✅ OK" "Réponse 200"
+          # -------- Llama‑server ----------
+          if curl -sSf http://127.0.0.1:8081/v1/models >/dev/null 2>&1; then
+            add_result "Llama‑server (8081)" "OK"
           else
-            log_test "Llama‑server health" "❌ KO" "Pas de réponse"
+            add_result "Llama‑server (8081)" "FAIL" "No response on /v1/models"
           fi
 
-          # 2️⃣ Test Open WebUI (si présent)
-          if curl -sSf "http://localhost:${PORT_WEBUI}/api/v1/status" >/dev/null 2>&1; then
-            log_test "Open WebUI health" "✅ OK" "Réponse 200"
+          # -------- Open‑WebUI ----------
+          if curl -sSf http://127.0.0.1:3000/api/v1/models >/dev/null 2>&1; then
+            add_result "Open‑WebUI (3000)" "OK"
           else
-            log_test "Open WebUI health" "⚠️ SKIPPED" "Service non activé ou endpoint différent"
+            # fallback to root page
+            if curl -sSf http://127.0.0.1:3000/ >/dev/null 2>&1; then
+              add_result "Open‑WebUI (3000)" "OK (root reachable)"
+            else
+              add_result "Open‑WebUI (3000)" "FAIL" "Neither API nor root responded"
+            fi
           fi
 
-          # 3️⃣ Test Code‑Server (page d’accueil)
-          if curl -sSf "http://localhost:${PORT_CODE}" | grep -iq "code‑server"; then
-            log_test "Code‑Server UI" "✅ OK" "Page d’accueil détectée"
+          # -------- Code‑Server ----------
+          if curl -sSf -I http://127.0.0.1:8080/ | grep -iq "200"; then
+            add_result "Code‑Server (8080)" "OK"
           else
-            log_test "Code‑Server UI" "❌ KO" "Page d’accueil absente"
+            add_result "Code‑Server (8080)" "FAIL" "HTTP 200 not returned"
           fi
 
-          # 4️⃣ Test OpenFang (agents) – endpoint `/health` ou `/`
-          if curl -sSf "http://localhost:${PORT_FANG}/health" >/dev/null 2>&1; then
-            log_test "OpenFang health" "✅ OK" "Endpoint /health OK"
+          # -------- OpenFang ----------
+          if curl -sSf http://127.0.0.1:4200/ >/dev/null 2>&1; then
+            add_result "OpenFang (4200)" "OK"
           else
-            log_test "OpenFang health" "⚠️ SKIPPED" "Service non activé ou endpoint différent"
+            add_result "OpenFang (4200)" "FAIL" "Root page unreachable"
           fi
 
-          # 5️⃣ Test Caddy reverse‑proxy (simple GET sur le domaine virtuel)
-          if curl -sSf "http://localhost:${PORT_CADDY}" >/dev/null 2>&1; then
-            log_test "Caddy proxy" "✅ OK" "Réponse du proxy"
+          # -------- LanceDB ----------
+          if curl -sSf http://127.0.0.1:8082/health >/dev/null 2>&1; then
+            add_result "LanceDB (8082)" "OK"
           else
-            log_test "Caddy proxy" "⚠️ SKIPPED" "Service non activé"
+            add_result "LanceDB (8082)" "FAIL" "Health endpoint not reachable"
           fi
 
-          # 6️⃣ Test Filebrowser (API /api/health)
-          if curl -sSf "http://localhost:${PORT_FILEBROWSER}/api/health" >/dev/null 2>&1; then
-            log_test "Filebrowser health" "✅ OK" "API health OK"
+          # -------- Caddy ----------
+          if curl -sSf http://127.0.0.1/ >/dev/null 2>&1; then
+            add_result "Caddy (80)" "OK"
           else
-            log_test "Filebrowser health" "⚠️ SKIPPED" "Service non activé"
+            add_result "Caddy (80)" "FAIL" "Reverse‑proxy not responding"
+          fi
+
+          # Write the report to a file
+          echo -e "$REPORT" > TEST-REPORT.md
+
+          # Export a flag for later steps (used to fail the job if any test failed)
+          if grep -q "❌" TEST-REPORT.md; then
+            echo "some_failed=true" >> $GITHUB_OUTPUT
+          else
+            echo "some_failed=false" >> $GITHUB_OUTPUT
           fi
 
       # ------------------------------------------------------------------
-      # 7️⃣ Générer le fichier TEST‑REPORT.md
+      # 6️⃣ Publier le rapport comme artefact (utile même si le commit échoue)
       # ------------------------------------------------------------------
-      - name: Create TEST-REPORT.md
+      - name: Upload TEST‑REPORT artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test‑report
+          path: TEST-REPORT.md
+
+      # ------------------------------------------------------------------
+      # 7️⃣ Commit / Update TEST‑REPORT.md dans le dépôt
+      # ------------------------------------------------------------------
+      - name: Commit TEST‑REPORT.md
+        if: always()                     # on veut toujours pousser le rapport, même en échec
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "🧪 CI – Update TEST‑REPORT.md"
+          branch: ${{ github.ref_name }}
+          file_pattern: TEST-REPORT.md
+          # Si le fichier n’existe pas encore, il sera créé
+          # Si le commit ne change rien (rapport identique), aucune nouvelle commit n’est créée
+          # Cette action utilise le token GITHUB_TOKEN automatiquement
+
+      # ------------------------------------------------------------------
+      # 8️⃣ (Optionnel) Fail the job if any test failed – makes the PR red
+      # ------------------------------------------------------------------
+      - name: Fail job on test failures
+        if: steps.functional_tests.outputs.some_failed == 'true'
+        run: |
+          echo "One or more functional tests failed – see TEST-REPORT.md"
+          exit 1
+
+      # ------------------------------------------------------------------
+      # 9️⃣ Nettoyage – arrêter et supprimer les conteneurs
+      # ------------------------------------------------------------------
+      - name: Tear down Docker Compose
+        if: always()
+        run: |
+          docker compose down --remove-orphans
+          docker system prune -f --volumes
