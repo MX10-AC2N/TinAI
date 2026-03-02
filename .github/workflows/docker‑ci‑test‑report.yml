@@ -15,7 +15,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Cache Docker layer OpenFang (évite de recompiler Rust à chaque run)
       - name: Cache OpenFang image
         id: cache-openfang
         uses: actions/cache@v4
@@ -39,7 +38,6 @@ jobs:
             echo "✅ Image buildée et mise en cache"
           fi
 
-      # Générer le docker-compose.yml
       - name: Generate docker-compose.yml
         run: |
           chmod +x install.sh
@@ -47,7 +45,6 @@ jobs:
           echo "── docker-compose.yml généré ──"
           cat TinAI/docker-compose.yml
 
-      # Installer le CLI tinai
       - name: Install tinai CLI
         run: |
           chmod +x tinai
@@ -55,14 +52,12 @@ jobs:
           sudo sed -i "s|TINAI_DIR_PLACEHOLDER|$(pwd)/TinAI|g" /usr/local/bin/tinai
           echo "✅ CLI tinai installé"
 
-      # Valider la syntaxe YAML
       - name: Validate docker-compose syntax
         run: |
           cd TinAI
           docker compose config > /dev/null
           echo "✅ Syntaxe docker-compose valide"
 
-      # Vérifier tous les services
       - name: Check all services defined
         run: |
           cd TinAI
@@ -81,14 +76,12 @@ jobs:
           done
           $ALL_OK || exit 1
 
-      # Démarrer tous les services
       - name: Start all services
         run: |
           cd TinAI
           docker compose up -d
           docker compose ps
 
-      # Attendre les services
       - name: Wait for services
         run: |
           wait_for() {
@@ -100,19 +93,18 @@ jobs:
             done
             echo "✅ ${i}s"
           }
-          wait_for "Open-WebUI   (3000)"   "http://127.0.0.1:3000/"              120 || true
-          wait_for "SillyTavern  (8008)"   "http://127.0.0.1:8008/"              120 || true
-          wait_for "Code-Server  (8080)"   "http://127.0.0.1:8080/"              120 || true
-          wait_for "OpenFang     (4200)"   "http://127.0.0.1:4200/"              120 || true
-          wait_for "Embeddings   (8084)"   "http://127.0.0.1:8084/health"         90 || true
-          wait_for "Qdrant       (6333)"   "http://127.0.0.1:6333/health"         60 || true
-          wait_for "Vision VL    (8085)"   "http://127.0.0.1:8085/health"        120 || true
-          wait_for "ComfyUI      (7860)"   "http://127.0.0.1:7860/"              120 || true
-          wait_for "llama-swap   (11434)"  "http://127.0.0.1:11434/health"        60 || true
-          wait_for "Caddy        (80)"     "http://127.0.0.1:80/"                 60 || true
-          wait_for "Filebrowser  (8083)"   "http://127.0.0.1:8083/"               60 || true
+          wait_for "Open-WebUI   (3000)"  "http://127.0.0.1:3000/"             120 || true
+          wait_for "SillyTavern  (8008)"  "http://127.0.0.1:8008/"             120 || true
+          wait_for "Code-Server  (8080)"  "http://127.0.0.1:8080/"             120 || true
+          wait_for "OpenFang     (4200)"  "http://127.0.0.1:4200/"             120 || true
+          wait_for "Embeddings   (8084)"  "http://127.0.0.1:8084/health"        90 || true
+          wait_for "Qdrant       (6333)"  "http://127.0.0.1:6333/healthz"       60 || true
+          wait_for "Vision       (8085)"  "http://127.0.0.1:8085/health"       120 || true
+          wait_for "ComfyUI      (7860)"  "http://127.0.0.1:7860/"             120 || true
+          wait_for "llama-swap   (11434)" "http://127.0.0.1:11434/health"       60 || true
+          wait_for "Caddy        (80)"    "http://127.0.0.1:80/"                60 || true
+          wait_for "Filebrowser  (8083)"  "http://127.0.0.1:8083/"              60 || true
 
-      # Tests fonctionnels
       - name: Run functional tests
         id: tests
         run: |
@@ -134,14 +126,13 @@ jobs:
           check "Code-Server (8080)"   "http://127.0.0.1:8080/"
           check "OpenFang (4200)"      "http://127.0.0.1:4200/"
           check "Embeddings (8084)"    "http://127.0.0.1:8084/health"
-          check "Qdrant (6333)"        "http://127.0.0.1:6333/health"
-          check "Vision VL (8085)"     "http://127.0.0.1:8085/health"
+          check "Qdrant (6333)"        "http://127.0.0.1:6333/healthz"
+          check "Vision (8085)"        "http://127.0.0.1:8085/health"
           check "ComfyUI (7860)"       "http://127.0.0.1:7860/"
           check "llama-swap (11434)"   "http://127.0.0.1:11434/health"
           check "Caddy (80)"           "http://127.0.0.1:80/"
           check "Filebrowser (8083)"   "http://127.0.0.1:8083/"
 
-          # llama-server : conteneur actif (modèle dl au 1er run)
           if docker ps --format '{{.Names}}' | grep -q "tinai-llama"; then
             ROWS+="| llama-server (8081) | ✅ Conteneur actif | modèle en dl au 1er run |\n"
           else
@@ -149,7 +140,6 @@ jobs:
             FAILED=true
           fi
 
-          # Test CLI
           CLI_OUT=$(tinai status 2>&1) && \
             ROWS+="| CLI \`tinai status\` | ✅ OK | - |\n" || \
             ROWS+="| CLI \`tinai status\` | ❌ FAIL | - |\n"
@@ -184,6 +174,7 @@ jobs:
 
           ### Notes
           - **llama-server** télécharge Qwen2.5-Coder-3B (~3 GB) au 1er démarrage
+          - **Vision** utilise LLaVA-Phi-3-mini (1 seul fichier GGUF, pas de mmproj séparé)
           - **OpenFang** buildé depuis source (image cachée entre les runs)
           - **Qdrant** remplace LanceDB (pas d'image Docker standalone disponible)
           REPORT
