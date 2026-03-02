@@ -1,0 +1,242 @@
+#!/bin/bash
+# ══════════════════════════════════════════════════════════════════
+#  tinai – CLI de gestion TinAI v2
+#  Usage : tinai <status|logs|update|model|stop|start|restart>
+# ══════════════════════════════════════════════════════════════════
+
+TINAI_VERSION="2.0.0"
+COMPOSE_FILE="${TINAI_DIR:-$HOME/TinAI}/docker-compose.yml"
+COMPOSE_DIR="$(dirname "$COMPOSE_FILE")"
+
+# Couleurs
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
+
+check_compose() {
+    if [ ! -f "$COMPOSE_FILE" ]; then
+        echo -e "${RED}❌ docker-compose.yml introuvable dans $COMPOSE_DIR${RESET}"
+        echo "   Lance d'abord : ./install.sh"
+        exit 1
+    fi
+}
+
+cmd_status() {
+    check_compose
+    echo -e "${BOLD}🧠 TinAI v${TINAI_VERSION} – État des services${RESET}"
+    echo "════════════════════════════════════════════"
+    cd "$COMPOSE_DIR"
+
+    declare -A PORTS=(
+        [tinai-llama]="8081"
+        [tinai-webui]="3000"
+        [tinai-sillytavern]="8008"
+        [tinai-code]="8080"
+        [tinai-aider]=""
+        [tinai-openfang]="4200"
+        [tinai-embeddings]="8084"
+        [tinai-lancedb]="8082"
+        [tinai-vision]="8085"
+        [tinai-comfyui]="7860"
+        [tinai-swap]="11434"
+        [tinai-caddy]="80"
+        [tinai-filebrowser]="8083"
+    )
+
+    declare -A LABELS=(
+        [tinai-llama]="llama-server  "
+        [tinai-webui]="Open WebUI    "
+        [tinai-sillytavern]="SillyTavern   "
+        [tinai-code]="Code-Server   "
+        [tinai-aider]="Aider         "
+        [tinai-openfang]="OpenFang      "
+        [tinai-embeddings]="Embeddings    "
+        [tinai-lancedb]="LanceDB       "
+        [tinai-vision]="Vision (VL)   "
+        [tinai-comfyui]="ComfyUI       "
+        [tinai-swap]="llama-swap    "
+        [tinai-caddy]="Caddy         "
+        [tinai-filebrowser]="Filebrowser   "
+    )
+
+    for container in "${!LABELS[@]}"; do
+        # Vérifie si le conteneur existe dans le compose
+        if ! docker compose ps --services 2>/dev/null | grep -q "${container#tinai-}"; then
+            continue
+        fi
+
+        STATE=$(docker inspect --format='{{.State.Status}}' "$container" 2>/dev/null || echo "absent")
+        PORT="${PORTS[$container]}"
+        LABEL="${LABELS[$container]}"
+
+        if [ "$STATE" = "running" ]; then
+            if [ -n "$PORT" ] && curl -sSf --max-time 2 "http://127.0.0.1:$PORT/" >/dev/null 2>&1; then
+                echo -e "  ${GREEN}✅${RESET} ${LABEL} → ${CYAN}http://localhost:${PORT}${RESET}"
+            elif [ -n "$PORT" ]; then
+                echo -e "  ${YELLOW}⏳${RESET} ${LABEL} → démarrage en cours (port $PORT)"
+            else
+                echo -e "  ${GREEN}✅${RESET} ${LABEL} → actif (pas de port HTTP)"
+            fi
+        elif [ "$STATE" = "absent" ]; then
+            : # service non installé, on skip silencieusement
+        else
+            echo -e "  ${RED}❌${RESET} ${LABEL} → $STATE"
+        fi
+    done
+
+    echo ""
+    echo -e "${BOLD}💾 Ressources :${RESET}"
+    docker stats --no-stream --format \
+        "  {{.Name}}\t CPU: {{.CPUPerc}}\t MEM: {{.MemUsage}}" 2>/dev/null \
+        | grep "tinai-" | column -t
+}
+
+cmd_logs() {
+    check_compose
+    cd "$COMPOSE_DIR"
+
+    SERVICES=$(docker compose ps --services 2>/dev/null)
+    if [ -z "$1" ]; then
+        # Menu interactif si gum disponible
+        if command -v gum &>/dev/null; then
+            SVC=$(echo "$SERVICES" | gum choose --header "Quel service ?")
+        else
+            echo "Services disponibles :"
+            echo "$SERVICES" | nl
+            read -rp "Numéro du service : " NUM
+            SVC=$(echo "$SERVICES" | sed -n "${NUM}p")
+        fi
+    else
+        SVC="$1"
+    fi
+
+    [ -z "$SVC" ] && exit 0
+    echo -e "${CYAN}📋 Logs de $SVC (Ctrl+C pour quitter)${RESET}"
+    docker compose logs -f --tail=100 "$SVC"
+}
+
+cmd_update() {
+    check_compose
+    cd "$COMPOSE_DIR"
+    echo -e "${BOLD}🔄 Mise à jour des images TinAI...${RESET}"
+    docker compose pull
+    echo -e "${GREEN}✅ Images mises à jour – redémarrage...${RESET}"
+    docker compose up -d --remove-orphans
+    echo -e "${GREEN}✅ TinAI v2 mis à jour !${RESET}"
+}
+
+cmd_model() {
+    check_compose
+    cd "$COMPOSE_DIR"
+
+    echo -e "${BOLD}🤖 Sélection du modèle llama-server${RESET}"
+    echo "════════════════════════════════════════════"
+
+    declare -A MODELS=(
+        ["Qwen2.5-Coder-3B (défaut – 2.2GB)"]="--hf-repo bartowski/Qwen2.5-Coder-3B-Instruct-GGUF --hf-file Qwen2.5-Coder-3B-Instruct-Q5_K_M.gguf"
+        ["Qwen2.5-Coder-7B (plus puissant – 4.8GB)"]="--hf-repo bartowski/Qwen2.5-Coder-7B-Instruct-GGUF --hf-file Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf"
+        ["Qwen2.5-VL-3B Multimodal (vision – 2.5GB)"]="--hf-repo bartowski/Qwen2.5-VL-3B-Instruct-GGUF --hf-file Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf"
+        ["Mistral-7B (généraliste – 4.1GB)"]="--hf-repo bartowski/Mistral-7B-Instruct-v0.3-GGUF --hf-file Mistral-7B-Instruct-v0.3-Q4_K_M.gguf"
+        ["Phi-3.5-mini (ultra léger – 2.2GB)"]="--hf-repo bartowski/Phi-3.5-mini-instruct-GGUF --hf-file Phi-3.5-mini-instruct-Q4_K_M.gguf"
+        ["DeepSeek-Coder-1.3B (micro – 0.8GB)"]="--hf-repo bartowski/deepseek-coder-1.3b-instruct-GGUF --hf-file deepseek-coder-1.3b-instruct-Q5_K_M.gguf"
+    )
+
+    MODEL_NAMES=("${!MODELS[@]}")
+
+    if command -v gum &>/dev/null; then
+        SELECTED=$(printf '%s\n' "${MODEL_NAMES[@]}" | gum choose --header "Choisis un modèle :")
+    else
+        echo "Modèles disponibles :"
+        for i in "${!MODEL_NAMES[@]}"; do
+            echo "  $((i+1))) ${MODEL_NAMES[$i]}"
+        done
+        read -rp "Numéro : " NUM
+        SELECTED="${MODEL_NAMES[$((NUM-1))]}"
+    fi
+
+    [ -z "$SELECTED" ] && exit 0
+
+    CMD="${MODELS[$SELECTED]}"
+    echo -e "${CYAN}→ Modèle sélectionné : $SELECTED${RESET}"
+
+    # Met à jour le command dans docker-compose.yml
+    # On reconstruit juste la ligne command du service llama-server
+    FULL_CMD="$CMD --host 0.0.0.0 --port 8081 --ctx-size 8192 --threads 4 --n-gpu-layers 0 --jinja"
+
+    # Backup
+    cp docker-compose.yml docker-compose.yml.bak
+
+    # Redémarre llama-server avec le nouveau modèle via env override
+    echo -e "${YELLOW}🔄 Redémarrage de llama-server avec le nouveau modèle...${RESET}"
+    docker compose stop llama-server
+    docker compose run --rm --entrypoint "" \
+        -e "LLAMA_CMD=$FULL_CMD" llama-server sh -c 'exec llama-server $LLAMA_CMD' &
+
+    # Méthode propre : recréer le conteneur avec les nouveaux args
+    docker rm -f tinai-llama 2>/dev/null || true
+    docker run -d \
+        --name tinai-llama \
+        --network "$(basename "$COMPOSE_DIR")_default" \
+        -p 8081:8081 \
+        -v "$(pwd)/models:/models" \
+        --memory 5.5g \
+        ghcr.io/ggml-org/llama.cpp:server \
+        $FULL_CMD
+
+    echo -e "${GREEN}✅ llama-server redémarré avec : $SELECTED${RESET}"
+    echo -e "   Accès : ${CYAN}http://localhost:8081/v1/models${RESET}"
+}
+
+cmd_stop() {
+    check_compose
+    cd "$COMPOSE_DIR"
+    echo -e "${YELLOW}⏹️  Arrêt de TinAI...${RESET}"
+    docker compose down
+    echo -e "${GREEN}✅ TinAI arrêté${RESET}"
+}
+
+cmd_start() {
+    check_compose
+    cd "$COMPOSE_DIR"
+    echo -e "${GREEN}▶️  Démarrage de TinAI...${RESET}"
+    docker compose up -d
+    echo -e "${GREEN}✅ TinAI démarré${RESET}"
+    cmd_status
+}
+
+cmd_restart() {
+    cmd_stop
+    sleep 2
+    cmd_start
+}
+
+cmd_help() {
+    echo -e "${BOLD}🧠 TinAI v${TINAI_VERSION} – CLI${RESET}"
+    echo ""
+    echo "Usage : tinai <commande> [options]"
+    echo ""
+    echo "Commandes :"
+    echo -e "  ${CYAN}status${RESET}          État de tous les services + ressources"
+    echo -e "  ${CYAN}logs [service]${RESET}  Logs d'un service (menu interactif si omis)"
+    echo -e "  ${CYAN}update${RESET}          Met à jour toutes les images Docker"
+    echo -e "  ${CYAN}model${RESET}           Change le modèle LLM de llama-server"
+    echo -e "  ${CYAN}start${RESET}           Démarre tous les services"
+    echo -e "  ${CYAN}stop${RESET}            Arrête tous les services"
+    echo -e "  ${CYAN}restart${RESET}         Redémarre tous les services"
+    echo ""
+    echo "Exemples :"
+    echo "  tinai status"
+    echo "  tinai logs llama-server"
+    echo "  tinai model"
+}
+
+# ── Routeur de commandes ──────────────────────────────────────────
+case "${1:-help}" in
+    status)  cmd_status  ;;
+    logs)    cmd_logs "$2" ;;
+    update)  cmd_update  ;;
+    model)   cmd_model   ;;
+    start)   cmd_start   ;;
+    stop)    cmd_stop    ;;
+    restart) cmd_restart ;;
+    *)       cmd_help    ;;
+esac
