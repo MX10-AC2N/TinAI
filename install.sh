@@ -44,7 +44,7 @@ Aider (pair programming autonome)
 OpenFang (agents autonomes 24/7)
 Embedding dédié – nomic-embed-text (RAG propre)
 Qdrant RAG (mémoire persistante des projets)
-Multimodal – Qwen2.5-VL (vision + texte)
+Multimodal – LLaVA-Phi-3-mini (vision + texte)
 ComfyUI (génération d'images locale)
 llama-swap (switch modèles à chaud)
 Caddy + Filebrowser (URLs propres + explorateur)"
@@ -84,7 +84,7 @@ else
         "OpenFang (agents autonomes 24/7)" \
         "Embedding dédié – nomic-embed-text (RAG propre)" \
         "Qdrant RAG (mémoire persistante des projets)" \
-        "Multimodal – Qwen2.5-VL (vision + texte)" \
+        "Multimodal – LLaVA-Phi-3-mini (vision + texte)" \
         "ComfyUI (génération d'images locale)" \
         "llama-swap (switch modèles à chaud)" \
         "Caddy + Filebrowser (URLs propres + explorateur)")
