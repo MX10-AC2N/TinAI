@@ -2,8 +2,6 @@ name: CI – TinAI v2 Deploy & Test
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 
 jobs:
   build-and-test:
