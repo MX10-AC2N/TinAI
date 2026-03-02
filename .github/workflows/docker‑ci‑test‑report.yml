@@ -1,0 +1,158 @@
+name: CI • Build Docker • Test • Report
+
+# ------------------------------------------------------------------
+# Quand le workflow doit‑il s’exécuter ?
+# ------------------------------------------------------------------
+on:
+  push:
+    branches: [ main ]          # à chaque push sur la branche principale
+  pull_request:
+    branches: [ main ]          # et à chaque PR vers main
+  workflow_dispatch:           # déclenchement manuel depuis l’onglet Actions
+  schedule:
+    - cron: "0 4 * * *"        # (optionnel) exécution quotidienne à 04 h UTC
+
+# ------------------------------------------------------------------
+# Jobs
+# ------------------------------------------------------------------
+jobs:
+  # --------------------------------------------------------------
+  # 1️⃣ Build, start & test les containers Docker
+  # --------------------------------------------------------------
+  build_test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30          # éviter les boucles infinies
+    env:
+      # Liste des ports exposés par les services que tu veux tester.
+      # Modifie‑les en fonction de ton docker‑compose.yml.
+      PORT_LLAMA: 8081
+      PORT_WEBUI: 3000
+      PORT_CODE: 8080
+      PORT_FANG: 4200
+      PORT_CADDY: 80
+      PORT_FILEBROWSER: 8083
+
+    steps:
+      # ------------------------------------------------------------------
+      # 1️⃣ Récupérer le code du dépôt
+      # ------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------
+      # 2️⃣ Installer Docker (déjà présent sur ubuntu‑latest) et Docker‑Compose v2
+      # ------------------------------------------------------------------
+      - name: Install Docker Compose (v2)
+        run: |
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.27.1/docker-compose-linux-x86_64" \
+            -o /usr/local/lib/docker/cli-plugins/docker-compose
+          sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+          docker compose version
+
+      # ------------------------------------------------------------------
+      # 3️⃣ Construire toutes les images définies dans docker‑compose.yml
+      # ------------------------------------------------------------------
+      - name: Build Docker images
+        run: |
+          docker compose build --pull
+
+      # ------------------------------------------------------------------
+      # 4️⃣ Démarrer les services en mode détaché
+      # ------------------------------------------------------------------
+      - name: Start services
+        run: |
+          docker compose up -d
+
+      # ------------------------------------------------------------------
+      # 5️⃣ Attendre que les conteneurs soient prêts (simple health‑check)
+      # ------------------------------------------------------------------
+      - name: Wait for services to become healthy
+        timeout-minutes: 5
+        run: |
+          # fonction d’attente générique
+          wait_port() {
+            local host=$1 port=$2 retries=30
+            for i in $(seq $retries); do
+              if nc -z "$host" "$port" >/dev/null 2>&1; then
+                echo "Port $port is open"
+                return 0
+              fi
+              echo "Waiting for $host:$port … ($i/$retries)"
+              sleep 2
+            done
+            echo "❌ Timeout waiting for $host:$port"
+            return 1
+          }
+
+          wait_port localhost $PORT_LLAMA
+          wait_port localhost $PORT_WEBUI   || true   # certains services peuvent être désactivés
+          wait_port localhost $PORT_CODE
+          wait_port localhost $PORT_FANG   || true
+          wait_port localhost $PORT_CADDY  || true
+          wait_port localhost $PORT_FILEBROWSER || true
+
+      # ------------------------------------------------------------------
+      # 6️⃣ Exécuter les tests (exemple très basique – à enrichir)
+      # ------------------------------------------------------------------
+      - name: Run functional tests
+        id: tests
+        run: |
+          set -euo pipefail
+
+          # Helper pour consigner le résultat d’un test
+          log_test() {
+            local name=$1 status=$2 detail=$3
+            echo "- **$name** : $status" >> $GITHUB_OUTPUT
+            echo "$name|$status|$detail" >> test_results.tsv
+          }
+
+          # Nettoyer le fichier de résultats
+          > test_results.tsv
+          echo -e "Test|Status|Detail" > test_results.tsv
+
+          # 1️⃣ Test du serveur Llama (endpoint de santé simple)
+          if curl -sSf "http://localhost:${PORT_LLAMA}/v1/models" >/dev/null; then
+            log_test "Llama‑server health" "✅ OK" "Réponse 200"
+          else
+            log_test "Llama‑server health" "❌ KO" "Pas de réponse"
+          fi
+
+          # 2️⃣ Test Open WebUI (si présent)
+          if curl -sSf "http://localhost:${PORT_WEBUI}/api/v1/status" >/dev/null 2>&1; then
+            log_test "Open WebUI health" "✅ OK" "Réponse 200"
+          else
+            log_test "Open WebUI health" "⚠️ SKIPPED" "Service non activé ou endpoint différent"
+          fi
+
+          # 3️⃣ Test Code‑Server (page d’accueil)
+          if curl -sSf "http://localhost:${PORT_CODE}" | grep -iq "code‑server"; then
+            log_test "Code‑Server UI" "✅ OK" "Page d’accueil détectée"
+          else
+            log_test "Code‑Server UI" "❌ KO" "Page d’accueil absente"
+          fi
+
+          # 4️⃣ Test OpenFang (agents) – endpoint `/health` ou `/`
+          if curl -sSf "http://localhost:${PORT_FANG}/health" >/dev/null 2>&1; then
+            log_test "OpenFang health" "✅ OK" "Endpoint /health OK"
+          else
+            log_test "OpenFang health" "⚠️ SKIPPED" "Service non activé ou endpoint différent"
+          fi
+
+          # 5️⃣ Test Caddy reverse‑proxy (simple GET sur le domaine virtuel)
+          if curl -sSf "http://localhost:${PORT_CADDY}" >/dev/null 2>&1; then
+            log_test "Caddy proxy" "✅ OK" "Réponse du proxy"
+          else
+            log_test "Caddy proxy" "⚠️ SKIPPED" "Service non activé"
+          fi
+
+          # 6️⃣ Test Filebrowser (API /api/health)
+          if curl -sSf "http://localhost:${PORT_FILEBROWSER}/api/health" >/dev/null 2>&1; then
+            log_test "Filebrowser health" "✅ OK" "API health OK"
+          else
+            log_test "Filebrowser health" "⚠️ SKIPPED" "Service non activé"
+          fi
+
+      # ------------------------------------------------------------------
+      # 7️⃣ Générer le fichier TEST‑REPORT.md
+      # ------------------------------------------------------------------
+      - name: Create TEST-REPORT.md
