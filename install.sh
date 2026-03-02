@@ -280,7 +280,7 @@ cat >> docker-compose.yml << 'QDRANT'
 QDRANT
 fi
 
-# ── Multimodal – Qwen2.5-VL ──────────────────────────────────────
+# ── Multimodal – LLaVA-Phi-3-mini (vision + texte, 1 seul fichier) ────────────
 if echo "$CHOICES" | grep -q "Multimodal"; then
 cat >> docker-compose.yml << 'VISION'
   vision:
@@ -289,11 +289,11 @@ cat >> docker-compose.yml << 'VISION'
     ports: ["8085:8085"]
     volumes: ["./models:/models"]
     command: >
-      --hf-repo bartowski/Qwen2.5-VL-3B-Instruct-GGUF
-      --hf-file Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf
+      --hf-repo xtuner/llava-phi-3-mini-gguf
+      --hf-file llava-phi-3-mini-f16.gguf
       --host 0.0.0.0 --port 8085
-      --ctx-size 4096 --threads 4 --n-gpu-layers 0 --jinja
-      --alias qwen-vl-3b
+      --ctx-size 4096 --threads 4 --n-gpu-layers 0
+      --alias llava-phi3-mini
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
