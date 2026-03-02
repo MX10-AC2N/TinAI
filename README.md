@@ -1,128 +1,201 @@
 # TinAI 🧠
 
-**Tiny AI Dev Assistant** – Ton assistant fullstack web 100 % local, ultra-léger, pour tous les SBC/CPU-only.
+[![CI – TinAI v2 Deploy & Test](https://github.com/RightNow-AI/TinAI/actions/workflows/ci.yml/badge.svg)](https://github.com/RightNow-AI/TinAI/actions/workflows/ci.yml)
+[![TEST-REPORT](https://img.shields.io/badge/test--report-voir%20les%20résultats-blue)](./TEST-REPORT.md)
+[![Version](https://img.shields.io/badge/version-2.0.0-green)](https://github.com/RightNow-AI/TinAI/releases)
+[![License](https://img.shields.io/badge/license-MIT-orange)](./LICENSE)
 
-Menu interactif **gum** → tu coches exactement ce que tu veux :
-- llama.cpp server (Qwen2.5-Coder-3B)
-- Open WebUI (frontend riche + RAG)
-- VS Code web + Continue.dev préconfiguré
-- Aider (pair programming autonome)
-- OpenFang (agents 24/7)
-- RAG LanceDB (mémoire persistante de tes repos GitHub)
-- llama-swap (switch modèles à chaud)
-- Caddy + Filebrowser (UX pro)
+**Tiny AI Dev Assistant** – Stack IA locale complète, modulaire, ultra-légère.  
+Un seul script. Un menu interactif. Tu coches ce que tu veux. C'est prêt.
 
-**Installation en 1 commande** :
+Conçu pour tourner sur n'importe quel CPU-only : Raspberry Pi, Orange Pi, mini PC, vieux laptop.  
+Tout reste **100 % offline, privé, ~5–7 GB RAM max**.
+
+---
+
+## Installation en 1 commande
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tonpseudo/TinAI/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RightNow-AI/TinAI/main/install.sh | bash
 ```
 
-Tout reste offline, privé, ~5-7 Go RAM max.
+> Remplace `RightNow-AI` par ton username GitHub.
 
-(Remplace `tonpseudo` par ton username GitHub)
+---
 
-#### 2. `install.sh` (le cœur du projet – beau menu gum)
+## Menu interactif
+
+Au lancement, un menu **gum** te permet de cocher exactement ce que tu veux :
+
+```
+👇 Coche les composants (espace = cocher, entrée = valider)
+   RAM disponible : 8.0 GB
+
+  ◉ llama-server (base obligatoire)
+  ◉ Open WebUI (frontend riche + RAG)
+  ◯ SillyTavern (frontend créatif)
+  ◉ Code-Server + Continue.dev (VS Code web)
+  ◯ Aider (pair programming autonome)
+  ◯ OpenFang (agents autonomes 24/7)
+  ◉ Embedding dédié – nomic-embed-text (RAG propre)
+  ◉ Qdrant RAG (mémoire persistante des projets)
+  ◯ Multimodal – Qwen2.5-VL (vision + texte)
+  ◯ ComfyUI (génération d'images locale)
+  ◯ llama-swap (switch modèles à chaud)
+  ◯ Caddy + Filebrowser (URLs propres + explorateur)
+```
+
+---
+
+## Services disponibles
+
+| Service | Description | Port | RAM |
+|---------|-------------|------|-----|
+| **llama-server** | Moteur LLM – Qwen2.5-Coder-3B (base obligatoire) | `8081` | ~3 GB |
+| **Open WebUI** | Frontend chat riche + RAG intégré | `3000` | ~500 MB |
+| **SillyTavern** | Frontend créatif – roleplay, personas, scénarios | `8008` | ~200 MB |
+| **Code-Server** | VS Code dans le navigateur + Continue.dev préconfiguré | `8080` | ~500 MB |
+| **Aider** | Pair programming autonome en CLI | – | ~100 MB |
+| **OpenFang** | Agent OS autonome 24/7 – 7 Hands prêts à l'emploi | `4200` | ~200 MB |
+| **Embeddings** | nomic-embed-text-v1.5 dédié au RAG | `8084` | ~500 MB |
+| **Qdrant** | Base vectorielle pour RAG + dashboard web | `6333` | ~200 MB |
+| **Vision VL** | Qwen2.5-VL-3B – analyse d'images + texte | `8085` | ~2.5 GB |
+| **ComfyUI** | Génération d'images locale (CPU) | `7860` | ~2 GB |
+| **llama-swap** | Switch de modèles à chaud sans redémarrer | `11434` | ~50 MB |
+| **Caddy** | Reverse proxy – URLs propres pour tous les services | `80` | ~30 MB |
+| **Filebrowser** | Explorateur de fichiers web pour `./projects` | `8083` | ~50 MB |
+
+---
+
+## Accès rapides après installation
+
+| Service | URL |
+|---------|-----|
+| Open WebUI | http://IP:3000 |
+| SillyTavern | http://IP:8008 |
+| VS Code | http://IP:8080 · mdp : `changezmoi123` |
+| OpenFang | http://IP:4200 |
+| ComfyUI | http://IP:7860 |
+| Filebrowser | http://IP:8083 |
+| llama-server API | http://IP:8081/v1 |
+| Embeddings API | http://IP:8084/v1 |
+| Vision VL API | http://IP:8085/v1 |
+| Qdrant dashboard | http://IP:6333/dashboard |
+| llama-swap | http://IP:11434 |
+
+---
+
+## CLI `tinai`
+
+Installé automatiquement par `install.sh` dans `/usr/local/bin/tinai`.
+
 ```bash
-#!/bin/bash
-set -e
+# État de tous les services + consommation RAM/CPU
+tinai status
 
-echo "🚀 Bienvenue dans TinAI – Tiny AI Dev Assistant"
+# Logs en direct d'un service (menu interactif si omis)
+tinai logs
+tinai logs llama-server
 
-# Installation de gum si absent
-if ! command -v gum &> /dev/null; then
-    echo "📦 Installation de gum (menu beau)..."
-    curl -fsSL https://github.com/charmbracelet/gum/releases/latest/download/gum_Linux_x86_64.tar.gz | tar -xz && sudo mv gum /usr/local/bin/
-fi
+# Changer de modèle LLM à chaud
+tinai model
 
-# Menu multi-sélection (cases à cocher)
-echo "Sélectionne les composants que tu veux (espace pour cocher, entrée pour valider) :"
-CHOICES=$(gum choose --no-limit \
-    "llama-server (base obligatoire)" \
-    "Open WebUI (frontend riche + RAG)" \
-    "Code-Server + Continue.dev (VS Code web)" \
-    "Aider (pair programming autonome)" \
-    "OpenFang (agents autonomes 24/7)" \
-    "LanceDB RAG (mémoire persistante des projets)" \
-    "llama-swap (switch modèles à chaud)" \
-    "Caddy + Filebrowser (URLs propres + explorateur)")
+# Mettre à jour toutes les images Docker
+tinai update
 
-# Création du dossier
-mkdir -p TinAI && cd TinAI
-mkdir -p templates models projects
+# Démarrer / Arrêter / Redémarrer
+tinai start
+tinai stop
+tinai restart
+```
 
-# Génération automatique du docker-compose.yml
-cat > docker-compose.yml << EOF
-version: '3.8'
-services:
-EOF
+### `tinai model` – Modèles disponibles
 
-# Service de base obligatoire
-cat >> docker-compose.yml << 'BASE'
-  llama-server:
-    image: ghcr.io/ggml-org/llama.cpp:server
-    container_name: tinai-llama
-    ports: ["8081:8081"]
-    volumes: ["./models:/models"]
-    command: >
-      -hf bartowski/Qwen2.5-Coder-3B-Instruct-GGUF
-      --model-file Qwen2.5-Coder-3B-Instruct-Q5_K_M.gguf
-      --host 0.0.0.0 --port 8081 --ctx-size 8192 --threads 4 --n-gpu-layers 0 --jinja
-    restart: unless-stopped
-    deploy: {resources: {limits: {memory: 5.5g}}}
-BASE
+| Modèle | Usage | Taille |
+|--------|-------|--------|
+| Qwen2.5-Coder-3B | Coding (défaut) | 2.2 GB |
+| Qwen2.5-Coder-7B | Coding puissant | 4.8 GB |
+| Qwen2.5-VL-3B | Vision + texte | 2.5 GB |
+| Mistral-7B | Généraliste | 4.1 GB |
+| Phi-3.5-mini | Ultra léger | 2.2 GB |
+| DeepSeek-Coder-1.3B | Micro coding | 0.8 GB |
 
-# Ajout conditionnel des services sélectionnés
-if echo "$CHOICES" | grep -q "Open WebUI"; then
-    cat >> docker-compose.yml << 'WEBUI'
-  open-webui:
-    image: ghcr.io/open-webui/open-webui:main
-    container_name: tinai-webui
-    ports: ["3000:8080"]
-    volumes: ["open-webui-data:/app/backend/data"]
-    environment:
-      - OPENAI_API_BASE_URL=http://llama-server:8081/v1
-      - OPENAI_API_KEY=sk-123456789
-    depends_on: [llama-server]
-    restart: unless-stopped
-WEBUI
-fi
+---
 
-if echo "$CHOICES" | grep -q "Code-Server"; then
-    cat >> docker-compose.yml << 'CODE'
-  code-server:
-    image: ghcr.io/coder/code-server:latest
-    container_name: tinai-code
-    ports: ["8080:8080"]
-    volumes: ["./projects:/home/coder/project", "code-data:/home/coder/.local/share/code-server"]
-    environment: {PASSWORD: changezmoi123}
-    entrypoint: /bin/sh -c "
-      code-server --install-extension Continue.continue &&
-      mkdir -p /home/coder/.continue &&
-      cat > /home/coder/.continue/config.json << 'JSON'
-{ \"models\": [{ \"title\": \"TinAI-Qwen\", \"provider\": \"openai\", \"model\": \"qwen-coder-3b\", \"apiBase\": \"http://llama-server:8081/v1\", \"apiKey\": \"sk-123456789\" }], \"tabAutocompleteModel\": { \"title\": \"TinAI-Auto\", \"provider\": \"openai\", \"model\": \"qwen-coder-3b\", \"apiBase\": \"http://llama-server:8081/v1\", \"apiKey\": \"sk-123456789\" } }
-JSON
-      && /usr/bin/entrypoint.sh"
-    restart: unless-stopped
-CODE
-fi
+## Architecture générée
 
-# (On peut ajouter les autres services de la même façon – Aider, OpenFang, etc. Je t’ai mis les 3 principaux pour commencer)
+`install.sh` génère dynamiquement un `docker-compose.yml` avec uniquement les services cochés.  
+Rien d'inutile ne tourne.
 
-cat >> docker-compose.yml << EOF
+```
+TinAI/
+├── docker-compose.yml        ← généré par install.sh
+├── models/                   ← modèles GGUF téléchargés automatiquement
+├── projects/                 ← tes projets (monté dans VS Code + Aider)
+├── comfyui/
+│   ├── models/               ← modèles ComfyUI
+│   └── output/               ← images générées
+├── Caddyfile                 ← généré si Caddy sélectionné
+└── llama-swap-config.yaml    ← généré si llama-swap sélectionné
+```
 
-volumes:
-  open-webui-data:
-  code-data:
-EOF
+---
 
-echo "✅ docker-compose.yml généré avec tes choix !"
-echo "🚀 Lancement..."
-docker compose up -d
+## CI/CD
 
-echo "
-🎉 TinAI est prêt !
-• Open WebUI → http://IP:3000
-• VS Code → http://IP:8080 (mdp: changezmoi123)
-• Chat direct → http://IP:8081
+Chaque push sur `main` déclenche le workflow GitHub Actions qui :
 
+1. **Compile OpenFang** depuis le source Rust (avec cache entre les runs)
+2. **Génère le `docker-compose.yml`** via `install.sh` en mode CI (tous les services)
+3. **Valide la syntaxe** YAML du compose
+4. **Vérifie** que tous les services sont bien définis
+5. **Démarre** tous les conteneurs
+6. **Teste** chaque endpoint HTTP
+7. **Committe `TEST-REPORT.md`** dans le repo avec les résultats
 
+→ [Voir le dernier TEST-REPORT.md](./TEST-REPORT.md)
+
+---
+
+## Configuration RAM recommandée
+
+| RAM | Stack conseillée |
+|-----|-----------------|
+| 4 GB | llama-server + Code-Server |
+| 6 GB | + Open WebUI + Qdrant + Embeddings |
+| 8 GB | + SillyTavern + OpenFang + llama-swap |
+| 12 GB+ | Stack complète avec Vision VL ou ComfyUI |
+
+---
+
+## Architecture supportée
+
+Détection automatique au lancement :
+
+- `x86_64` — PC, serveur, mini PC
+- `aarch64` — Raspberry Pi 4/5, Orange Pi, Radxa
+- `armv7l` — Raspberry Pi 3 et équivalents
+
+---
+
+## Repo
+
+```
+TinAI/
+├── install.sh          ← installateur principal
+├── tinai               ← CLI de gestion
+├── TEST-REPORT.md      ← rapport du dernier run CI
+└── .github/
+    └── workflows/
+        └── ci.yml      ← pipeline CI/CD
+```
+
+---
+
+## License
+
+MIT – utilise-le comme tu veux.
+
+---
+
+*Fait avec ❤️ pour les makers, devs indés, et bidouilleurs de SBC.*
