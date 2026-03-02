@@ -2,6 +2,8 @@ name: CI – TinAI v2 Deploy & Test
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 jobs:
   build-and-test:
@@ -15,31 +17,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Cache de l'image OpenFang pour éviter de recompiler Rust à chaque run
-      - name: Cache OpenFang Docker layer
+      # Cache Docker layer OpenFang (évite de recompiler Rust à chaque run)
+      - name: Cache OpenFang image
+        id: cache-openfang
         uses: actions/cache@v4
         with:
           path: /tmp/openfang-image.tar
-          key: openfang-${{ hashFiles('**/openfang-version.txt') }}-v1
-          restore-keys: openfang-
+          key: openfang-image-${{ hashFiles('openfang-version.txt') }}
+          restore-keys: openfang-image-
 
       - name: Build or restore OpenFang image
         run: |
-          if [ -f /tmp/openfang-image.tar ]; then
-            echo "♻️  Restauration de l'image OpenFang depuis le cache..."
+          if [ "${{ steps.cache-openfang.outputs.cache-hit }}" = "true" ] && [ -f /tmp/openfang-image.tar ]; then
+            echo "♻️  Restauration OpenFang depuis le cache..."
             docker load -i /tmp/openfang-image.tar
+            echo "✅ Image restaurée"
           else
-            echo "🔨 Compilation OpenFang depuis le source (Rust)..."
+            echo "🔨 Compilation OpenFang depuis le source..."
             git clone --depth=1 https://github.com/RightNow-AI/openfang.git /tmp/openfang
-            # Sauvegarder la version pour invalider le cache si besoin
             git -C /tmp/openfang rev-parse HEAD > openfang-version.txt
             docker build -t tinai-openfang:latest /tmp/openfang
             docker save tinai-openfang:latest -o /tmp/openfang-image.tar
             echo "✅ Image buildée et mise en cache"
           fi
 
-      # Générer le docker-compose.yml via install.sh
-      - name: Generate docker-compose.yml (CI mode)
+      # Générer le docker-compose.yml
+      - name: Generate docker-compose.yml
         run: |
           chmod +x install.sh
           CI=true ./install.sh
@@ -50,8 +53,8 @@ jobs:
       - name: Install tinai CLI
         run: |
           chmod +x tinai
-          sudo cp tinai /usr/local/bin/tinai-cli
-          echo "TINAI_DIR=$(pwd)/TinAI" >> $GITHUB_ENV
+          sudo cp tinai /usr/local/bin/tinai
+          sudo sed -i "s|TINAI_DIR_PLACEHOLDER|$(pwd)/TinAI|g" /usr/local/bin/tinai
           echo "✅ CLI tinai installé"
 
       # Valider la syntaxe YAML
@@ -61,14 +64,14 @@ jobs:
           docker compose config > /dev/null
           echo "✅ Syntaxe docker-compose valide"
 
-      # Vérifier que tous les services sont définis
+      # Vérifier tous les services
       - name: Check all services defined
         run: |
           cd TinAI
           ALL_OK=true
           for svc in \
             tinai-llama tinai-webui tinai-sillytavern tinai-code \
-            tinai-aider tinai-openfang tinai-embeddings tinai-lancedb \
+            tinai-aider tinai-openfang tinai-embeddings tinai-qdrant \
             tinai-vision tinai-comfyui tinai-swap tinai-caddy tinai-filebrowser
           do
             if grep -q "container_name: $svc" docker-compose.yml; then
@@ -85,10 +88,9 @@ jobs:
         run: |
           cd TinAI
           docker compose up -d
-          echo "── État initial ──"
           docker compose ps
 
-      # Attendre que les services soient prêts
+      # Attendre les services
       - name: Wait for services
         run: |
           wait_for() {
@@ -100,17 +102,17 @@ jobs:
             done
             echo "✅ ${i}s"
           }
-          wait_for "Open-WebUI   (3000)"  "http://127.0.0.1:3000/"        120 || true
-          wait_for "SillyTavern  (8008)"  "http://127.0.0.1:8008/"        120 || true
-          wait_for "Code-Server  (8080)"  "http://127.0.0.1:8080/"        120 || true
-          wait_for "OpenFang     (4200)"  "http://127.0.0.1:4200/"        120 || true
-          wait_for "Embeddings   (8084)"  "http://127.0.0.1:8084/health"   90 || true
-          wait_for "LanceDB      (8082)"  "http://127.0.0.1:8082/health"   90 || true
-          wait_for "Vision       (8085)"  "http://127.0.0.1:8085/health"  120 || true
-          wait_for "ComfyUI      (7860)"  "http://127.0.0.1:7860/"        120 || true
-          wait_for "llama-swap   (11434)" "http://127.0.0.1:11434/health"  90 || true
-          wait_for "Caddy        (80)"    "http://127.0.0.1:80/"           60 || true
-          wait_for "Filebrowser  (8083)"  "http://127.0.0.1:8083/"         60 || true
+          wait_for "Open-WebUI   (3000)"   "http://127.0.0.1:3000/"              120 || true
+          wait_for "SillyTavern  (8008)"   "http://127.0.0.1:8008/"              120 || true
+          wait_for "Code-Server  (8080)"   "http://127.0.0.1:8080/"              120 || true
+          wait_for "OpenFang     (4200)"   "http://127.0.0.1:4200/"              120 || true
+          wait_for "Embeddings   (8084)"   "http://127.0.0.1:8084/health"         90 || true
+          wait_for "Qdrant       (6333)"   "http://127.0.0.1:6333/health"         60 || true
+          wait_for "Vision VL    (8085)"   "http://127.0.0.1:8085/health"        120 || true
+          wait_for "ComfyUI      (7860)"   "http://127.0.0.1:7860/"              120 || true
+          wait_for "llama-swap   (11434)"  "http://127.0.0.1:11434/health"        60 || true
+          wait_for "Caddy        (80)"     "http://127.0.0.1:80/"                 60 || true
+          wait_for "Filebrowser  (8083)"   "http://127.0.0.1:8083/"               60 || true
 
       # Tests fonctionnels
       - name: Run functional tests
@@ -134,14 +136,14 @@ jobs:
           check "Code-Server (8080)"   "http://127.0.0.1:8080/"
           check "OpenFang (4200)"      "http://127.0.0.1:4200/"
           check "Embeddings (8084)"    "http://127.0.0.1:8084/health"
-          check "LanceDB (8082)"       "http://127.0.0.1:8082/health"
+          check "Qdrant (6333)"        "http://127.0.0.1:6333/health"
           check "Vision VL (8085)"     "http://127.0.0.1:8085/health"
           check "ComfyUI (7860)"       "http://127.0.0.1:7860/"
           check "llama-swap (11434)"   "http://127.0.0.1:11434/health"
           check "Caddy (80)"           "http://127.0.0.1:80/"
           check "Filebrowser (8083)"   "http://127.0.0.1:8083/"
 
-          # llama-server : on vérifie le conteneur (modèle dl au 1er run)
+          # llama-server : conteneur actif (modèle dl au 1er run)
           if docker ps --format '{{.Names}}' | grep -q "tinai-llama"; then
             ROWS+="| llama-server (8081) | ✅ Conteneur actif | modèle en dl au 1er run |\n"
           else
@@ -149,10 +151,10 @@ jobs:
             FAILED=true
           fi
 
-          # Test CLI tinai status
-          TINAI_DIR="$(pwd)/TinAI" tinai status > /tmp/tinai-status.txt 2>&1 && \
-            ROWS+="| CLI tinai status | ✅ OK | - |\n" || \
-            ROWS+="| CLI tinai status | ❌ FAIL | voir logs |\n"
+          # Test CLI
+          CLI_OUT=$(tinai status 2>&1) && \
+            ROWS+="| CLI \`tinai status\` | ✅ OK | - |\n" || \
+            ROWS+="| CLI \`tinai status\` | ❌ FAIL | - |\n"
 
           CONTAINERS=$(cd TinAI && docker compose ps 2>&1)
 
@@ -164,34 +166,31 @@ jobs:
           **Commit :** \`${{ github.sha }}\`
           **Branch :** \`${{ github.ref_name }}\`
 
-          ### ✅ Résultats des tests
+          ### Résultats
 
           | Service | Statut | Endpoint |
           |---------|--------|----------|
           $(echo -e "$ROWS")
 
-          ### 🐳 État des conteneurs
+          ### État des conteneurs
 
           \`\`\`
           $CONTAINERS
           \`\`\`
 
-          ### 📋 tinai status output
+          ### tinai status
 
           \`\`\`
-          $(cat /tmp/tinai-status.txt)
+          $CLI_OUT
           \`\`\`
 
-          ### 📝 Notes
-          - **llama-server** télécharge le modèle Qwen2.5-Coder-3B (~3 GB) au 1er démarrage
-          - **OpenFang** buildé depuis source [RightNow-AI/openfang](https://github.com/RightNow-AI/openfang) (image cachée entre les runs)
-          - **llama-swap** image officielle \`ghcr.io/mostlygeek/llama-swap:cpu\`
-          - **Embeddings** nomic-embed-text-v1.5 (~300 MB)
-          - **Vision** Qwen2.5-VL-3B (~2.5 GB)
+          ### Notes
+          - **llama-server** télécharge Qwen2.5-Coder-3B (~3 GB) au 1er démarrage
+          - **OpenFang** buildé depuis source (image cachée entre les runs)
+          - **Qdrant** remplace LanceDB (pas d'image Docker standalone disponible)
           REPORT
 
           cat TEST-REPORT.md
-
           $FAILED && echo "failed=true" >> $GITHUB_OUTPUT || echo "failed=false" >> $GITHUB_OUTPUT
 
       - name: Upload TEST-REPORT artifact
@@ -211,7 +210,7 @@ jobs:
       - name: Fail on test failures
         if: steps.tests.outputs.failed == 'true'
         run: |
-          echo "❌ Des tests ont échoué – voir TEST-REPORT.md"
+          echo "❌ Tests échoués – voir TEST-REPORT.md"
           exit 1
 
       - name: Teardown
