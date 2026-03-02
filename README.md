@@ -2,7 +2,7 @@
 
 [![CI – TinAI v2 Deploy & Test](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker%E2%80%91ci%E2%80%91test%E2%80%91report.yml/badge.svg)](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker%E2%80%91ci%E2%80%91test%E2%80%91report.yml)
 [![TEST-REPORT](https://img.shields.io/badge/test--report-voir%20les%20résultats-blue)](./TEST-REPORT.md)
-[![Version](https://img.shields.io/badge/version-2.0.0-green)](https://github.com/RightNow-AI/TinAI/releases)
+[![Version](https://img.shields.io/badge/version-2.0.0-green)](https://github.com/MX10-AC2N/TinAI/releases)
 [![License](https://img.shields.io/badge/license-MIT-orange)](./LICENSE)
 
 **Tiny AI Dev Assistant** – Stack IA locale complète, modulaire, ultra-légère.  
@@ -16,10 +16,8 @@ Tout reste **100 % offline, privé, ~5–7 GB RAM max**.
 ## Installation en 1 commande
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/RightNow-AI/TinAI/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/MX10-AC2N/TinAI/main/install.sh | bash
 ```
-
-> Remplace `RightNow-AI` par ton username GitHub.
 
 ---
 
@@ -39,7 +37,7 @@ Au lancement, un menu **gum** te permet de cocher exactement ce que tu veux :
   ◯ OpenFang (agents autonomes 24/7)
   ◉ Embedding dédié – nomic-embed-text (RAG propre)
   ◉ Qdrant RAG (mémoire persistante des projets)
-  ◯ Multimodal – Qwen2.5-VL (vision + texte)
+  ◯ Multimodal – LLaVA-Phi-3-mini (vision + texte)
   ◯ ComfyUI (génération d'images locale)
   ◯ llama-swap (switch modèles à chaud)
   ◯ Caddy + Filebrowser (URLs propres + explorateur)
@@ -59,7 +57,7 @@ Au lancement, un menu **gum** te permet de cocher exactement ce que tu veux :
 | **OpenFang** | Agent OS autonome 24/7 – 7 Hands prêts à l'emploi | `4200` | ~200 MB |
 | **Embeddings** | nomic-embed-text-v1.5 dédié au RAG | `8084` | ~500 MB |
 | **Qdrant** | Base vectorielle pour RAG + dashboard web | `6333` | ~200 MB |
-| **Vision VL** | Qwen2.5-VL-3B – analyse d'images + texte | `8085` | ~2.5 GB |
+| **Vision** | LLaVA-Phi-3-mini – analyse d'images + texte | `8085` | ~2.2 GB |
 | **ComfyUI** | Génération d'images locale (CPU) | `7860` | ~2 GB |
 | **llama-swap** | Switch de modèles à chaud sans redémarrer | `11434` | ~50 MB |
 | **Caddy** | Reverse proxy – URLs propres pour tous les services | `80` | ~30 MB |
@@ -79,7 +77,7 @@ Au lancement, un menu **gum** te permet de cocher exactement ce que tu veux :
 | Filebrowser | http://IP:8083 |
 | llama-server API | http://IP:8081/v1 |
 | Embeddings API | http://IP:8084/v1 |
-| Vision VL API | http://IP:8085/v1 |
+| Vision API | http://IP:8085/v1 |
 | Qdrant dashboard | http://IP:6333/dashboard |
 | llama-swap | http://IP:11434 |
 
@@ -115,7 +113,7 @@ tinai restart
 |--------|-------|--------|
 | Qwen2.5-Coder-3B | Coding (défaut) | 2.2 GB |
 | Qwen2.5-Coder-7B | Coding puissant | 4.8 GB |
-| Qwen2.5-VL-3B | Vision + texte | 2.5 GB |
+| LLaVA-Phi-3-mini | Vision + texte | 2.2 GB |
 | Mistral-7B | Généraliste | 4.1 GB |
 | Phi-3.5-mini | Ultra léger | 2.2 GB |
 | DeepSeek-Coder-1.3B | Micro coding | 0.8 GB |
@@ -160,11 +158,11 @@ Chaque push sur `main` déclenche le workflow GitHub Actions qui :
 ## Configuration RAM recommandée
 
 | RAM | Stack conseillée |
-|-----|-----------------|
+|-----|-----------------| 
 | 4 GB | llama-server + Code-Server |
 | 6 GB | + Open WebUI + Qdrant + Embeddings |
 | 8 GB | + SillyTavern + OpenFang + llama-swap |
-| 12 GB+ | Stack complète avec Vision VL ou ComfyUI |
+| 12 GB+ | Stack complète avec Vision ou ComfyUI |
 
 ---
 
@@ -187,7 +185,7 @@ TinAI/
 ├── TEST-REPORT.md      ← rapport du dernier run CI
 └── .github/
     └── workflows/
-        └── ci.yml      ← pipeline CI/CD
+        └── docker‑ci‑test‑report.yml
 ```
 
 ---
