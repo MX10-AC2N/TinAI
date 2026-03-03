@@ -221,13 +221,14 @@ cat >> docker-compose.yml << SILLY
       - sillytavern-config:/home/node/app/config
     environment:
       - SILLYTAVERN_HEARTBEATINTERVAL=30
+      - SILLYTAVERN_WHITELIST=false
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "src/healthcheck.js"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 20s
+      start_period: 30s
 SILLY
 fi
 
@@ -401,9 +402,9 @@ cat >> docker-compose.yml << COMFY
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8188/system_stats"]
       interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      timeout: 15s
+      retries: 10
+      start_period: 300s
     deploy:
       resources:
         limits:
