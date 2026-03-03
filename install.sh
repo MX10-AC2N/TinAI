@@ -163,11 +163,11 @@ cat >> docker-compose.yml << 'SILLY'
       - sillytavern-config:/home/node/app/config
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/ping"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
 SILLY
 fi
 
@@ -199,6 +199,7 @@ cat >> docker-compose.yml << 'AIDER'
   aider:
     image: paulgauthier/aider:latest
     container_name: tinai-aider
+    entrypoint: ["/bin/sh", "-c", "tail -f /dev/null"]
     volumes: ["./projects:/app"]
     environment:
       - OPENAI_API_BASE=http://llama-server:8081/v1
@@ -207,30 +208,46 @@ cat >> docker-compose.yml << 'AIDER'
     depends_on:
       llama-server:
         condition: service_healthy
-    restart: unless-stopped
+    restart: on-failure
 AIDER
 fi
 
 # ── OpenFang ──────────────────────────────────────────────────────
 if echo "$CHOICES" | grep -q "OpenFang"; then
+mkdir -p openfang-config
+cat > openfang-config/openfang.toml << 'OPENFANGCONF'
+[server]
+host = "0.0.0.0"
+port = 4200
+
+[llm]
+base_url = "http://llama-server:8081/v1"
+api_key = "sk-tinai"
+model = "qwen-coder-3b"
+
+[agents]
+dir = "/opt/openfang/agents"
+OPENFANGCONF
 cat >> docker-compose.yml << 'FANG'
   openfang:
     image: tinai-openfang:latest
     container_name: tinai-openfang
     ports: ["4200:4200"]
+    volumes: ["./openfang-config:/etc/openfang"]
     environment:
       - OPENAI_BASE_URL=http://llama-server:8081/v1
       - OPENAI_API_KEY=sk-tinai
+      - OPENFANG_CONFIG=/etc/openfang/openfang.toml
     depends_on:
       llama-server:
         condition: service_healthy
-    restart: unless-stopped
+    restart: on-failure
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4200/"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 30s
+      retries: 5
+      start_period: 60s
 FANG
 fi
 
@@ -272,7 +289,7 @@ cat >> docker-compose.yml << 'QDRANT'
     volumes: ["qdrant-data:/qdrant/storage"]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -314,7 +331,7 @@ cat >> docker-compose.yml << 'COMFY'
   comfyui:
     image: ghcr.io/ai-dock/comfyui:latest-cpu
     container_name: tinai-comfyui
-    ports: ["7860:7860"]
+    ports: ["7860:8188"]
     volumes:
       - ./comfyui/models:/opt/ComfyUI/models
       - ./comfyui/output:/opt/ComfyUI/output
@@ -322,11 +339,11 @@ cat >> docker-compose.yml << 'COMFY'
       - CLI_ARGS=--cpu
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7860/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8188/"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 120s
     deploy:
       resources:
         limits:
@@ -470,4 +487,3 @@ if [ "${CI:-}" != "true" ]; then
     echo "║  CLI : tinai status / logs / update / model  ║"
     echo "╚══════════════════════════════════════════════╝"
 fi
-
