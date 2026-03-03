@@ -7,6 +7,35 @@
 TINAI_VERSION="2.0.0"
 COMPOSE_DIR="${TINAI_DIR:-TINAI_DIR_PLACEHOLDER}"
 COMPOSE_FILE="$COMPOSE_DIR/docker-compose.yml"
+ENV_FILE="${COMPOSE_DIR}/../.env"
+
+# Charger le .env si présent (ports configurables)
+if [ -f "$ENV_FILE" ]; then
+    set -a; source "$ENV_FILE"; set +a
+elif [ -f "$COMPOSE_DIR/.env" ]; then
+    set -a; source "$COMPOSE_DIR/.env"; set +a
+fi
+
+# Valeurs par défaut (identiques à install.sh)
+PORT_LLAMA="${PORT_LLAMA:-8081}"
+PORT_WEBUI="${PORT_WEBUI:-3000}"
+PORT_SILLYTAVERN="${PORT_SILLYTAVERN:-8008}"
+PORT_CODE="${PORT_CODE:-8080}"
+PORT_OPENFANG="${PORT_OPENFANG:-4200}"
+PORT_EMBEDDINGS="${PORT_EMBEDDINGS:-8084}"
+PORT_QDRANT="${PORT_QDRANT:-6333}"
+PORT_VISION="${PORT_VISION:-8085}"
+PORT_COMFYUI="${PORT_COMFYUI:-7860}"
+PORT_SWAP="${PORT_SWAP:-11434}"
+PORT_CADDY="${PORT_CADDY:-80}"
+PORT_FILEBROWSER="${PORT_FILEBROWSER:-8083}"
+MODELS_DIR="${MODELS_DIR:-./models}"
+LLAMA_MEM_LIMIT="${LLAMA_MEM_LIMIT:-5.5g}"
+LLAMA_CTX_SIZE="${LLAMA_CTX_SIZE:-8192}"
+LLAMA_THREADS="${LLAMA_THREADS:-4}"
+LLAMA_GPU_LAYERS="${LLAMA_GPU_LAYERS:-0}"
+LLAMA_HF_REPO="${LLAMA_HF_REPO:-bartowski/Qwen2.5-Coder-3B-Instruct-GGUF}"
+LLAMA_HF_FILE="${LLAMA_HF_FILE:-Qwen2.5-Coder-3B-Instruct-Q5_K_M.gguf}"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
@@ -26,19 +55,19 @@ cmd_status() {
     cd "$COMPOSE_DIR"
 
     declare -A PORTS=(
-        [tinai-llama]="8081"
-        [tinai-webui]="3000"
-        [tinai-sillytavern]="8008"
-        [tinai-code]="8080"
+        [tinai-llama]="${PORT_LLAMA}"
+        [tinai-webui]="${PORT_WEBUI}"
+        [tinai-sillytavern]="${PORT_SILLYTAVERN}"
+        [tinai-code]="${PORT_CODE}"
         [tinai-aider]=""
-        [tinai-openfang]="4200"
-        [tinai-embeddings]="8084"
-        [tinai-qdrant]="6333"
-        [tinai-vision]="8085"
-        [tinai-comfyui]="7860"
-        [tinai-swap]="11434"
-        [tinai-caddy]="80"
-        [tinai-filebrowser]="8083"
+        [tinai-openfang]="${PORT_OPENFANG}"
+        [tinai-embeddings]="${PORT_EMBEDDINGS}"
+        [tinai-qdrant]="${PORT_QDRANT}"
+        [tinai-vision]="${PORT_VISION}"
+        [tinai-comfyui]="${PORT_COMFYUI}"
+        [tinai-swap]="${PORT_SWAP}"
+        [tinai-caddy]="${PORT_CADDY}"
+        [tinai-filebrowser]="${PORT_FILEBROWSER}"
     )
 
     declare -A LABELS=(
@@ -123,6 +152,10 @@ cmd_model() {
     echo -e "${BOLD}🤖 Sélection du modèle llama-server${RESET}"
     echo "════════════════════════════════════════════"
 
+    # Modèle actif chargé depuis .env (ou défaut)
+    echo -e "  Modèle actuel : ${CYAN}${LLAMA_HF_FILE}${RESET}"
+    echo ""
+
     declare -A MODELS=(
         ["Qwen2.5-Coder-3B  – coding  – 2.2 GB (défaut)"]="--hf-repo bartowski/Qwen2.5-Coder-3B-Instruct-GGUF --hf-file Qwen2.5-Coder-3B-Instruct-Q5_K_M.gguf"
         ["Qwen2.5-Coder-7B  – coding  – 4.8 GB"]="--hf-repo bartowski/Qwen2.5-Coder-7B-Instruct-GGUF --hf-file Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf"
@@ -147,7 +180,7 @@ cmd_model() {
 
     [ -z "$SELECTED" ] && exit 0
     ARGS="${MODELS[$SELECTED]}"
-    FULL_CMD="$ARGS --host 0.0.0.0 --port 8081 --ctx-size 8192 --threads 4 --n-gpu-layers 0 --jinja"
+    FULL_CMD="$ARGS --host 0.0.0.0 --port 8081 --ctx-size ${LLAMA_CTX_SIZE} --threads ${LLAMA_THREADS} --n-gpu-layers ${LLAMA_GPU_LAYERS} --jinja"
 
     echo -e "${YELLOW}🔄 Remplacement de llama-server...${RESET}"
     docker rm -f tinai-llama 2>/dev/null || true
@@ -157,14 +190,14 @@ cmd_model() {
     docker run -d \
         --name tinai-llama \
         --network "$NETWORK" \
-        -p 8081:8081 \
-        -v "$(pwd)/models:/models" \
-        --memory 5.5g \
+        -p "${PORT_LLAMA}:8081" \
+        -v "$(pwd)/${MODELS_DIR}:/models" \
+        --memory "${LLAMA_MEM_LIMIT}" \
         ghcr.io/ggml-org/llama.cpp:server \
         $FULL_CMD
 
     echo -e "${GREEN}✅ Modèle changé : $SELECTED${RESET}"
-    echo -e "   Accès : ${CYAN}http://localhost:8081/v1/models${RESET}"
+    echo -e "   Accès : ${CYAN}http://localhost:${PORT_LLAMA}/v1/models${RESET}"
 }
 
 cmd_stop() {
