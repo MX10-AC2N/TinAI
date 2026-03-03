@@ -8,6 +8,64 @@ set -e
 
 TINAI_VERSION="2.0.0"
 
+# ── Chargement du .env (si présent dans le répertoire courant) ────
+if [ -f ".env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source .env
+    set +a
+    echo "📄 Configuration chargée depuis .env"
+elif [ -f "../.env" ]; then
+    set -a
+    source ../.env
+    set +a
+    echo "📄 Configuration chargée depuis ../.env"
+fi
+
+# ── Valeurs par défaut (surchargées par .env) ─────────────────────
+MODELS_DIR="${MODELS_DIR:-./models}"
+PROJECTS_DIR="${PROJECTS_DIR:-./projects}"
+COMFYUI_MODELS_DIR="${COMFYUI_MODELS_DIR:-./comfyui/models}"
+COMFYUI_OUTPUT_DIR="${COMFYUI_OUTPUT_DIR:-./comfyui/output}"
+OPENFANG_CONFIG_DIR="${OPENFANG_CONFIG_DIR:-./openfang-config}"
+
+PORT_LLAMA="${PORT_LLAMA:-8081}"
+PORT_WEBUI="${PORT_WEBUI:-3000}"
+PORT_SILLYTAVERN="${PORT_SILLYTAVERN:-8008}"
+PORT_CODE="${PORT_CODE:-8080}"
+PORT_OPENFANG="${PORT_OPENFANG:-4200}"
+PORT_EMBEDDINGS="${PORT_EMBEDDINGS:-8084}"
+PORT_QDRANT="${PORT_QDRANT:-6333}"
+PORT_QDRANT_GRPC="${PORT_QDRANT_GRPC:-6334}"
+PORT_VISION="${PORT_VISION:-8085}"
+PORT_COMFYUI="${PORT_COMFYUI:-7860}"
+PORT_SWAP="${PORT_SWAP:-11434}"
+PORT_CADDY="${PORT_CADDY:-80}"
+PORT_CADDY_HTTPS="${PORT_CADDY_HTTPS:-443}"
+PORT_FILEBROWSER="${PORT_FILEBROWSER:-8083}"
+
+CODE_PASSWORD="${CODE_PASSWORD:-changezmoi123}"
+TINAI_API_KEY="${TINAI_API_KEY:-sk-tinai}"
+
+LLAMA_HF_REPO="${LLAMA_HF_REPO:-bartowski/Qwen2.5-Coder-3B-Instruct-GGUF}"
+LLAMA_HF_FILE="${LLAMA_HF_FILE:-Qwen2.5-Coder-3B-Instruct-Q5_K_M.gguf}"
+AIDER_MODEL="${AIDER_MODEL:-qwen-coder-3b}"
+
+LLAMA_CTX_SIZE="${LLAMA_CTX_SIZE:-8192}"
+LLAMA_THREADS="${LLAMA_THREADS:-4}"
+LLAMA_GPU_LAYERS="${LLAMA_GPU_LAYERS:-0}"
+LLAMA_MEM_LIMIT="${LLAMA_MEM_LIMIT:-5.5g}"
+
+EMBED_CTX_SIZE="${EMBED_CTX_SIZE:-2048}"
+EMBED_THREADS="${EMBED_THREADS:-2}"
+EMBED_MEM_LIMIT="${EMBED_MEM_LIMIT:-1g}"
+
+VISION_CTX_SIZE="${VISION_CTX_SIZE:-4096}"
+VISION_THREADS="${VISION_THREADS:-4}"
+VISION_MEM_LIMIT="${VISION_MEM_LIMIT:-4g}"
+
+COMFYUI_MEM_LIMIT="${COMFYUI_MEM_LIMIT:-4g}"
+
 echo "🧠 TinAI v${TINAI_VERSION} – Tiny AI Dev Assistant"
 echo "════════════════════════════════════════════════"
 
@@ -92,7 +150,7 @@ fi
 
 # ── Création de la structure ──────────────────────────────────────
 mkdir -p TinAI && cd TinAI
-mkdir -p models projects comfyui/models comfyui/output
+mkdir -p "${MODELS_DIR}" "${PROJECTS_DIR}" "${COMFYUI_MODELS_DIR}" "${COMFYUI_OUTPUT_DIR}"
 
 # ════════════════════════════════════════════════════════════════
 #  Génération du docker-compose.yml
@@ -103,17 +161,17 @@ services:
 EOF
 
 # ── llama-server ─────────────────────────────────────────────────
-cat >> docker-compose.yml << 'BASE'
+cat >> docker-compose.yml << BASE
   llama-server:
     image: ghcr.io/ggml-org/llama.cpp:server
     container_name: tinai-llama
-    ports: ["8081:8081"]
-    volumes: ["./models:/models"]
+    ports: ["${PORT_LLAMA}:8081"]
+    volumes: ["${MODELS_DIR}:/models"]
     command: >
-      --hf-repo bartowski/Qwen2.5-Coder-3B-Instruct-GGUF
-      --hf-file Qwen2.5-Coder-3B-Instruct-Q5_K_M.gguf
-      --host 0.0.0.0 --port 8081 --ctx-size 8192
-      --threads 4 --n-gpu-layers 0 --jinja
+      --hf-repo ${LLAMA_HF_REPO}
+      --hf-file ${LLAMA_HF_FILE}
+      --host 0.0.0.0 --port 8081 --ctx-size ${LLAMA_CTX_SIZE}
+      --threads ${LLAMA_THREADS} --n-gpu-layers ${LLAMA_GPU_LAYERS} --jinja
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
@@ -124,20 +182,20 @@ cat >> docker-compose.yml << 'BASE'
     deploy:
       resources:
         limits:
-          memory: 5.5g
+          memory: ${LLAMA_MEM_LIMIT}
 BASE
 
 # ── Open WebUI ────────────────────────────────────────────────────
 if echo "$CHOICES" | grep -q "Open WebUI"; then
-cat >> docker-compose.yml << 'WEBUI'
+cat >> docker-compose.yml << WEBUI
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: tinai-webui
-    ports: ["3000:8080"]
+    ports: ["${PORT_WEBUI}:8080"]
     volumes: ["open-webui-data:/app/backend/data"]
     environment:
       - OPENAI_API_BASE_URL=http://llama-server:8081/v1
-      - OPENAI_API_KEY=sk-tinai
+      - OPENAI_API_KEY=${TINAI_API_KEY}
     depends_on:
       llama-server:
         condition: service_healthy
@@ -153,11 +211,11 @@ fi
 
 # ── SillyTavern ───────────────────────────────────────────────────
 if echo "$CHOICES" | grep -q "SillyTavern"; then
-cat >> docker-compose.yml << 'SILLY'
+cat >> docker-compose.yml << SILLY
   sillytavern:
     image: ghcr.io/sillytavern/sillytavern:latest
     container_name: tinai-sillytavern
-    ports: ["8008:8000"]
+    ports: ["${PORT_SILLYTAVERN}:8000"]
     volumes:
       - sillytavern-data:/home/node/app/data
       - sillytavern-config:/home/node/app/config
@@ -173,16 +231,16 @@ fi
 
 # ── Code-Server ───────────────────────────────────────────────────
 if echo "$CHOICES" | grep -q "Code-Server"; then
-cat >> docker-compose.yml << 'CODE'
+cat >> docker-compose.yml << CODE
   code-server:
     image: ghcr.io/coder/code-server:latest
     container_name: tinai-code
-    ports: ["8080:8080"]
+    ports: ["${PORT_CODE}:8080"]
     volumes:
-      - ./projects:/home/coder/project
+      - ${PROJECTS_DIR}:/home/coder/project
       - code-data:/home/coder/.local/share/code-server
     environment:
-      - PASSWORD=changezmoi123
+      - PASSWORD=${CODE_PASSWORD}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/"]
@@ -195,16 +253,16 @@ fi
 
 # ── Aider ─────────────────────────────────────────────────────────
 if echo "$CHOICES" | grep -q "Aider"; then
-cat >> docker-compose.yml << 'AIDER'
+cat >> docker-compose.yml << AIDER
   aider:
     image: paulgauthier/aider:latest
     container_name: tinai-aider
     entrypoint: ["/bin/sh", "-c", "tail -f /dev/null"]
-    volumes: ["./projects:/app"]
+    volumes: ["${PROJECTS_DIR}:/app"]
     environment:
       - OPENAI_API_BASE=http://llama-server:8081/v1
-      - OPENAI_API_KEY=sk-tinai
-      - AIDER_MODEL=qwen-coder-3b
+      - OPENAI_API_KEY=${TINAI_API_KEY}
+      - AIDER_MODEL=${AIDER_MODEL}
     depends_on:
       llama-server:
         condition: service_healthy
@@ -214,29 +272,29 @@ fi
 
 # ── OpenFang ──────────────────────────────────────────────────────
 if echo "$CHOICES" | grep -q "OpenFang"; then
-mkdir -p openfang-config
-cat > openfang-config/openfang.toml << 'OPENFANGCONF'
+mkdir -p "${OPENFANG_CONFIG_DIR}"
+cat > "${OPENFANG_CONFIG_DIR}/openfang.toml" << OPENFANGCONF
 [server]
 host = "0.0.0.0"
 port = 4200
 
 [llm]
 base_url = "http://llama-server:8081/v1"
-api_key = "sk-tinai"
+api_key = "${TINAI_API_KEY}"
 model = "qwen-coder-3b"
 
 [agents]
 dir = "/opt/openfang/agents"
 OPENFANGCONF
-cat >> docker-compose.yml << 'FANG'
+cat >> docker-compose.yml << FANG
   openfang:
     image: tinai-openfang:latest
     container_name: tinai-openfang
-    ports: ["4200:4200"]
-    volumes: ["./openfang-config:/etc/openfang"]
+    ports: ["${PORT_OPENFANG}:4200"]
+    volumes: ["${OPENFANG_CONFIG_DIR}:/etc/openfang"]
     environment:
       - OPENAI_BASE_URL=http://llama-server:8081/v1
-      - OPENAI_API_KEY=sk-tinai
+      - OPENAI_API_KEY=${TINAI_API_KEY}
       - OPENFANG_CONFIG=/etc/openfang/openfang.toml
     depends_on:
       llama-server:
@@ -253,17 +311,17 @@ fi
 
 # ── Embedding dédié – nomic-embed-text ───────────────────────────
 if echo "$CHOICES" | grep -q "Embedding"; then
-cat >> docker-compose.yml << 'EMBED'
+cat >> docker-compose.yml << EMBED
   embeddings:
     image: ghcr.io/ggml-org/llama.cpp:server
     container_name: tinai-embeddings
-    ports: ["8084:8084"]
-    volumes: ["./models:/models"]
+    ports: ["${PORT_EMBEDDINGS}:8084"]
+    volumes: ["${MODELS_DIR}:/models"]
     command: >
       --hf-repo nomic-ai/nomic-embed-text-v1.5-GGUF
       --hf-file nomic-embed-text-v1.5.Q4_K_M.gguf
       --host 0.0.0.0 --port 8084
-      --ctx-size 2048 --threads 2 --n-gpu-layers 0
+      --ctx-size ${EMBED_CTX_SIZE} --threads ${EMBED_THREADS} --n-gpu-layers ${LLAMA_GPU_LAYERS}
       --embedding --alias nomic-embed-text
     restart: unless-stopped
     healthcheck:
@@ -275,17 +333,17 @@ cat >> docker-compose.yml << 'EMBED'
     deploy:
       resources:
         limits:
-          memory: 1g
+          memory: ${EMBED_MEM_LIMIT}
 EMBED
 fi
 
 # ── Qdrant ────────────────────────────────────────────────────────
 if echo "$CHOICES" | grep -q "Qdrant"; then
-cat >> docker-compose.yml << 'QDRANT'
+cat >> docker-compose.yml << QDRANT
   qdrant:
     image: qdrant/qdrant:latest
     container_name: tinai-qdrant
-    ports: ["6333:6333", "6334:6334"]
+    ports: ["${PORT_QDRANT}:6333", "${PORT_QDRANT_GRPC}:6334"]
     volumes: ["qdrant-data:/qdrant/storage"]
     restart: unless-stopped
     healthcheck:
@@ -299,17 +357,17 @@ fi
 
 # ── Multimodal – LLaVA-Phi-3-mini (vision + texte, 1 seul fichier) ────────────
 if echo "$CHOICES" | grep -q "Multimodal"; then
-cat >> docker-compose.yml << 'VISION'
+cat >> docker-compose.yml << VISION
   vision:
     image: ghcr.io/ggml-org/llama.cpp:server
     container_name: tinai-vision
-    ports: ["8085:8085"]
-    volumes: ["./models:/models"]
+    ports: ["${PORT_VISION}:8085"]
+    volumes: ["${MODELS_DIR}:/models"]
     command: >
       --hf-repo xtuner/llava-phi-3-mini-gguf
       --hf-file llava-phi-3-mini-f16.gguf
       --host 0.0.0.0 --port 8085
-      --ctx-size 4096 --threads 4 --n-gpu-layers 0
+      --ctx-size ${VISION_CTX_SIZE} --threads ${VISION_THREADS} --n-gpu-layers ${LLAMA_GPU_LAYERS}
       --alias llava-phi3-mini
     restart: unless-stopped
     healthcheck:
@@ -321,20 +379,20 @@ cat >> docker-compose.yml << 'VISION'
     deploy:
       resources:
         limits:
-          memory: 4g
+          memory: ${VISION_MEM_LIMIT}
 VISION
 fi
 
 # ── ComfyUI ───────────────────────────────────────────────────────
 if echo "$CHOICES" | grep -q "ComfyUI"; then
-cat >> docker-compose.yml << 'COMFY'
+cat >> docker-compose.yml << COMFY
   comfyui:
     image: ghcr.io/ai-dock/comfyui:latest-cpu
     container_name: tinai-comfyui
-    ports: ["7860:8188"]
+    ports: ["${PORT_COMFYUI}:8188"]
     volumes:
-      - ./comfyui/models:/opt/ComfyUI/models
-      - ./comfyui/output:/opt/ComfyUI/output
+      - ${COMFYUI_MODELS_DIR}:/opt/ComfyUI/models
+      - ${COMFYUI_OUTPUT_DIR}:/opt/ComfyUI/output
     environment:
       - CLI_ARGS=--cpu
     restart: unless-stopped
@@ -347,33 +405,33 @@ cat >> docker-compose.yml << 'COMFY'
     deploy:
       resources:
         limits:
-          memory: 4g
+          memory: ${COMFYUI_MEM_LIMIT}
 COMFY
 fi
 
 # ── llama-swap ────────────────────────────────────────────────────
 if echo "$CHOICES" | grep -q "llama-swap"; then
-cat > llama-swap-config.yaml << 'SWAPCONF'
+cat > llama-swap-config.yaml << SWAPCONF
 models:
   qwen-coder-3b:
     cmd: >
-      llama-server --port ${PORT}
+      llama-server --port \${PORT}
       --hf-repo bartowski/Qwen2.5-Coder-3B-Instruct-GGUF
       --hf-file Qwen2.5-Coder-3B-Instruct-Q5_K_M.gguf
       --host 0.0.0.0 --ctx-size 8192 --threads 4 --n-gpu-layers 0 --jinja
   qwen-vl-3b:
     cmd: >
-      llama-server --port ${PORT}
+      llama-server --port \${PORT}
       --hf-repo bartowski/Qwen2.5-VL-3B-Instruct-GGUF
       --hf-file Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf
       --host 0.0.0.0 --ctx-size 4096 --threads 4 --n-gpu-layers 0 --jinja
 SWAPCONF
 
-cat >> docker-compose.yml << 'SWAP'
+cat >> docker-compose.yml << SWAP
   llama-swap:
     image: ghcr.io/mostlygeek/llama-swap:cpu
     container_name: tinai-swap
-    ports: ["11434:8080"]
+    ports: ["${PORT_SWAP}:8080"]
     volumes: ["./llama-swap-config.yaml:/app/config.yaml"]
     restart: unless-stopped
     healthcheck:
@@ -387,7 +445,7 @@ fi
 
 # ── Caddy + Filebrowser ───────────────────────────────────────────
 if echo "$CHOICES" | grep -q "Caddy"; then
-cat > Caddyfile << 'CADDYFILE'
+cat > Caddyfile << CADDYFILE
 :80 {
     handle /webui* {
         reverse_proxy tinai-webui:8080
@@ -402,7 +460,7 @@ cat > Caddyfile << 'CADDYFILE'
         reverse_proxy tinai-filebrowser:80
     }
     handle /comfy* {
-        reverse_proxy tinai-comfyui:7860
+        reverse_proxy tinai-comfyui:8188
     }
     handle /silly* {
         reverse_proxy tinai-sillytavern:8000
@@ -413,11 +471,11 @@ cat > Caddyfile << 'CADDYFILE'
 }
 CADDYFILE
 
-cat >> docker-compose.yml << 'CADDY'
+cat >> docker-compose.yml << CADDY
   caddy:
     image: caddy:alpine
     container_name: tinai-caddy
-    ports: ["80:80", "443:443"]
+    ports: ["${PORT_CADDY}:80", "${PORT_CADDY_HTTPS}:443"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy-data:/data
@@ -431,16 +489,16 @@ cat >> docker-compose.yml << 'CADDY'
   filebrowser:
     image: filebrowser/filebrowser:latest
     container_name: tinai-filebrowser
-    ports: ["8083:80"]
+    ports: ["${PORT_FILEBROWSER}:80"]
     volumes:
-      - ./projects:/srv
+      - ${PROJECTS_DIR}:/srv
       - filebrowser-db:/database
     restart: unless-stopped
 CADDY
 fi
 
 # ── Volumes ───────────────────────────────────────────────────────
-cat >> docker-compose.yml << 'VOLUMES'
+cat >> docker-compose.yml << VOLUMES
 volumes:
   open-webui-data:
   sillytavern-data:
@@ -472,18 +530,19 @@ if [ "${CI:-}" != "true" ]; then
     echo "╔══════════════════════════════════════════════╗"
     echo "║         🎉 TinAI v2 est prêt !               ║"
     echo "╠══════════════════════════════════════════════╣"
-    echo "║  Open WebUI    → http://IP:3000              ║"
-    echo "║  SillyTavern   → http://IP:8008              ║"
-    echo "║  VS Code       → http://IP:8080              ║"
-    echo "║  OpenFang      → http://IP:4200              ║"
-    echo "║  ComfyUI       → http://IP:7860              ║"
-    echo "║  Filebrowser   → http://IP:8083              ║"
-    echo "║  llama-server  → http://IP:8081              ║"
-    echo "║  Embeddings    → http://IP:8084              ║"
-    echo "║  Vision VL     → http://IP:8085              ║"
-    echo "║  Qdrant        → http://IP:6333              ║"
-    echo "║  llama-swap    → http://IP:11434             ║"
+    echo "║  Open WebUI    → http://IP:${PORT_WEBUI}             ║"
+    echo "║  SillyTavern   → http://IP:${PORT_SILLYTAVERN}             ║"
+    echo "║  VS Code       → http://IP:${PORT_CODE}             ║"
+    echo "║  OpenFang      → http://IP:${PORT_OPENFANG}             ║"
+    echo "║  ComfyUI       → http://IP:${PORT_COMFYUI}             ║"
+    echo "║  Filebrowser   → http://IP:${PORT_FILEBROWSER}             ║"
+    echo "║  llama-server  → http://IP:${PORT_LLAMA}             ║"
+    echo "║  Embeddings    → http://IP:${PORT_EMBEDDINGS}             ║"
+    echo "║  Vision VL     → http://IP:${PORT_VISION}             ║"
+    echo "║  Qdrant        → http://IP:${PORT_QDRANT}             ║"
+    echo "║  llama-swap    → http://IP:${PORT_SWAP}             ║"
     echo "╠══════════════════════════════════════════════╣"
     echo "║  CLI : tinai status / logs / update / model  ║"
     echo "╚══════════════════════════════════════════════╝"
 fi
+
