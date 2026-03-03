@@ -225,7 +225,7 @@ cat >> docker-compose.yml << SILLY
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 180s
 SILLY
 fi
 
@@ -401,7 +401,7 @@ cat >> docker-compose.yml << COMFY
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 120s
+      start_period: 180s
     deploy:
       resources:
         limits:
