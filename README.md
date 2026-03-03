@@ -19,6 +19,69 @@ Tout reste **100 % offline, privé, ~5–7 GB RAM max**.
 curl -fsSL https://raw.githubusercontent.com/MX10-AC2N/TinAI/main/install.sh | bash
 ```
 
+### Installation personnalisée (ports, répertoires, modèle)
+
+```bash
+# 1. Cloner le repo
+git clone https://github.com/MX10-AC2N/TinAI.git && cd TinAI
+
+# 2. Configurer (optionnel)
+cp .env.example .env
+nano .env
+
+# 3. Installer
+./install.sh
+```
+
+---
+
+## Configuration `.env`
+
+Toutes les valeurs sont optionnelles — les défauts fonctionnent out-of-the-box.
+
+```bash
+cp .env.example .env
+```
+
+### Ports
+
+```dotenv
+PORT_LLAMA=8081        # API LLM principale
+PORT_WEBUI=3000        # Open WebUI
+PORT_CODE=8080         # VS Code web
+PORT_SILLYTAVERN=8008  # SillyTavern
+PORT_OPENFANG=4200     # OpenFang agents
+PORT_EMBEDDINGS=8084   # Embeddings RAG
+PORT_QDRANT=6333       # Qdrant REST
+PORT_VISION=8085       # Vision LLaVA
+PORT_COMFYUI=7860      # ComfyUI images
+PORT_SWAP=11434        # llama-swap
+PORT_CADDY=80          # Reverse proxy
+PORT_FILEBROWSER=8083  # Explorateur fichiers
+```
+
+### Répertoires
+
+```dotenv
+MODELS_DIR=./models              # Modèles GGUF
+PROJECTS_DIR=./projects          # Tes projets (VS Code + Aider)
+COMFYUI_MODELS_DIR=./comfyui/models
+COMFYUI_OUTPUT_DIR=./comfyui/output
+OPENFANG_CONFIG_DIR=./openfang-config
+```
+
+### Modèle & paramètres LLM
+
+```dotenv
+LLAMA_HF_REPO=bartowski/Qwen2.5-Coder-3B-Instruct-GGUF
+LLAMA_HF_FILE=Qwen2.5-Coder-3B-Instruct-Q5_K_M.gguf
+LLAMA_CTX_SIZE=8192
+LLAMA_THREADS=4
+LLAMA_MEM_LIMIT=5.5g
+```
+
+> Le `.env` est automatiquement lu par `install.sh` et le CLI `tinai`.
+
 ---
 
 ## Menu interactif
@@ -47,8 +110,8 @@ Au lancement, un menu **gum** te permet de cocher exactement ce que tu veux :
 
 ## Services disponibles
 
-| Service | Description | Port | RAM |
-|---------|-------------|------|-----|
+| Service | Description | Port défaut | RAM |
+|---------|-------------|-------------|-----|
 | **llama-server** | Moteur LLM – Qwen2.5-Coder-3B (base obligatoire) | `8081` | ~3 GB |
 | **Open WebUI** | Frontend chat riche + RAG intégré | `3000` | ~500 MB |
 | **SillyTavern** | Frontend créatif – roleplay, personas, scénarios | `8008` | ~200 MB |
@@ -81,11 +144,14 @@ Au lancement, un menu **gum** te permet de cocher exactement ce que tu veux :
 | Qdrant dashboard | http://IP:6333/dashboard |
 | llama-swap | http://IP:11434 |
 
+> Les ports sont ceux par défaut. Si tu les as changés dans `.env`, adapte en conséquence.
+
 ---
 
 ## CLI `tinai`
 
-Installé automatiquement par `install.sh` dans `/usr/local/bin/tinai`.
+Installé automatiquement par `install.sh` dans `/usr/local/bin/tinai`.  
+Lit le `.env` automatiquement pour respecter tes ports et paramètres personnalisés.
 
 ```bash
 # État de tous les services + consommation RAM/CPU
@@ -133,6 +199,8 @@ TinAI/
 ├── comfyui/
 │   ├── models/               ← modèles ComfyUI
 │   └── output/               ← images générées
+├── openfang-config/
+│   └── openfang.toml         ← généré si OpenFang sélectionné
 ├── Caddyfile                 ← généré si Caddy sélectionné
 └── llama-swap-config.yaml    ← généré si llama-swap sélectionné
 ```
@@ -144,12 +212,13 @@ TinAI/
 Chaque push sur `main` déclenche le workflow GitHub Actions qui :
 
 1. **Compile OpenFang** depuis le source Rust (avec cache entre les runs)
-2. **Génère le `docker-compose.yml`** via `install.sh` en mode CI (tous les services)
-3. **Valide la syntaxe** YAML du compose
-4. **Vérifie** que tous les services sont bien définis
-5. **Démarre** tous les conteneurs
-6. **Teste** chaque endpoint HTTP
-7. **Committe `TEST-REPORT.md`** dans le repo avec les résultats
+2. **Initialise le `.env`** depuis `.env.example` (ports par défaut)
+3. **Génère le `docker-compose.yml`** via `install.sh` en mode CI (tous les services)
+4. **Valide la syntaxe** YAML du compose
+5. **Vérifie** que tous les services sont bien définis
+6. **Démarre** tous les conteneurs
+7. **Teste** chaque endpoint HTTP
+8. **Committe `TEST-REPORT.md`** dans le repo avec les résultats
 
 → [Voir le dernier TEST-REPORT.md](./TEST-REPORT.md)
 
@@ -158,7 +227,7 @@ Chaque push sur `main` déclenche le workflow GitHub Actions qui :
 ## Configuration RAM recommandée
 
 | RAM | Stack conseillée |
-|-----|-----------------| 
+|-----|-----------------|
 | 4 GB | llama-server + Code-Server |
 | 6 GB | + Open WebUI + Qdrant + Embeddings |
 | 8 GB | + SillyTavern + OpenFang + llama-swap |
@@ -180,9 +249,10 @@ Détection automatique au lancement :
 
 ```
 TinAI/
-├── install.sh          ← installateur principal
-├── tinai               ← CLI de gestion
-├── TEST-REPORT.md      ← rapport du dernier run CI
+├── install.sh                  ← installateur principal
+├── tinai                       ← CLI de gestion
+├── .env.example                ← configuration (ports, répertoires, modèle)
+├── TEST-REPORT.md              ← rapport du dernier run CI
 └── .github/
     └── workflows/
         └── docker‑ci‑test‑report.yml
