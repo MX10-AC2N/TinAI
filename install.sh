@@ -221,7 +221,7 @@ cat >> docker-compose.yml << SILLY
       - sillytavern-config:/home/node/app/config
     environment:
       - SILLYTAVERN_HEARTBEATINTERVAL=30
-      - SILLYTAVERN_WHITELIST=false
+      - SILLYTAVERN_WHITELISTMODE=false
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "src/healthcheck.js"]
