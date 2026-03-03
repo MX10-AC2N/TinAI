@@ -209,7 +209,7 @@ TinAI/
 
 ## CI/CD
 
-Chaque push sur `main` déclenche le workflow GitHub Actions qui :
+Le workflow GitHub Actions qui :
 
 1. **Compile OpenFang** depuis le source Rust (avec cache entre les runs)
 2. **Initialise le `.env`** depuis `.env.example` (ports par défaut)
