@@ -547,3 +547,4 @@ if [ "${CI:-}" != "true" ]; then
     echo "║  CLI : tinai status / logs / update / model  ║"
     echo "╚══════════════════════════════════════════════╝"
 fi
+
