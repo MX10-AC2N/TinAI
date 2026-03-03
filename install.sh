@@ -219,13 +219,15 @@ cat >> docker-compose.yml << SILLY
     volumes:
       - sillytavern-data:/home/node/app/data
       - sillytavern-config:/home/node/app/config
+    environment:
+      - SILLYTAVERN_HEARTBEATINTERVAL=30
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/ping"]
+      test: ["CMD", "node", "src/healthcheck.js"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 180s
+      start_period: 20s
 SILLY
 fi
 
@@ -387,21 +389,21 @@ fi
 if echo "$CHOICES" | grep -q "ComfyUI"; then
 cat >> docker-compose.yml << COMFY
   comfyui:
-    image: ghcr.io/ai-dock/comfyui:latest-cpu
+    image: yanwk/comfyui-boot:cpu
     container_name: tinai-comfyui
     ports: ["${PORT_COMFYUI}:8188"]
     volumes:
-      - ${COMFYUI_MODELS_DIR}:/opt/ComfyUI/models
-      - ${COMFYUI_OUTPUT_DIR}:/opt/ComfyUI/output
+      - ${COMFYUI_MODELS_DIR}:/root/ComfyUI/models
+      - ${COMFYUI_OUTPUT_DIR}:/root/ComfyUI/output
     environment:
-      - CLI_ARGS=--cpu
+      - CLI_ARGS=--cpu --listen 0.0.0.0
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8188/"]
+      test: ["CMD", "curl", "-sf", "http://localhost:8188/system_stats"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 180s
+      start_period: 60s
     deploy:
       resources:
         limits:
@@ -545,4 +547,3 @@ if [ "${CI:-}" != "true" ]; then
     echo "║  CLI : tinai status / logs / update / model  ║"
     echo "╚══════════════════════════════════════════════╝"
 fi
-
