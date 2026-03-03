@@ -1,0 +1,4 @@
+openfang-config/openfang.toml
+!openfang-config/openfang.toml.example
+TinAI/
+.env
