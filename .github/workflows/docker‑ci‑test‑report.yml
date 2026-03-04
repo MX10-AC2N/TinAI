@@ -115,8 +115,9 @@ jobs:
       - name: Debug – logs des services lents
         if: always()
         run: |
-          echo "=== SillyTavern ==" && docker logs tinai-sillytavern --tail=80 2>&1 || true
-          echo "=== ComfyUI ==" && docker logs tinai-comfyui --tail=30 2>&1 || true
+          echo "=== SillyTavern (premiers logs) ==" && docker logs tinai-sillytavern 2>&1 | head -60 || true
+          echo "=== SillyTavern (derniers logs) ==" && docker logs tinai-sillytavern --tail=20 2>&1 || true
+          echo "=== ComfyUI ===" && docker logs tinai-comfyui --tail=20 2>&1 || true
 
       - name: Run functional tests
         id: tests
