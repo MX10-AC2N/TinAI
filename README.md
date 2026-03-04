@@ -1,7 +1,9 @@
 # TinAI 🧠
 
-[![CI – TinAI v2 Deploy & Test](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker%E2%80%91ci%E2%80%91test%E2%80%91report.yml/badge.svg)](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker%E2%80%91ci%E2%80%91test%E2%80%91report.yml)
-[![TEST-REPORT](https://img.shields.io/badge/test--report-voir%20les%20résultats-blue)](./TEST-REPORT.md)
+[![CI x86_64](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker%E2%80%91ci%E2%80%91test%E2%80%91report.yml/badge.svg)](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker%E2%80%91ci%E2%80%91test%E2%80%91report.yml)
+[![CI ARM64](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker%E2%80%91ci%E2%80%91test%E2%80%91report%E2%80%91arm64.yml/badge.svg)](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker%E2%80%91ci%E2%80%91test%E2%80%91report%E2%80%91arm64.yml)
+[![TEST-REPORT x86](https://img.shields.io/badge/test--report-x86__64-blue)](./TEST-REPORT.md)
+[![TEST-REPORT ARM64](https://img.shields.io/badge/test--report-arm64-blueviolet)](./TEST-REPORT-arm64.md)
 [![Version](https://img.shields.io/badge/version-2.0.0-green)](https://github.com/MX10-AC2N/TinAI/releases)
 [![License](https://img.shields.io/badge/license-MIT-orange)](./LICENSE)
 
@@ -209,18 +211,33 @@ TinAI/
 
 ## CI/CD
 
-Le workflow GitHub Actions qui :
+Deux workflows GitHub Actions tournent en parallèle sur chaque déclenchement manuel :
+
+### Workflow x86_64
+
+Tourne sur `ubuntu-latest` (runner GitHub-hosted x86_64).
 
 1. **Compile OpenFang** depuis le source Rust (avec cache entre les runs)
 2. **Initialise le `.env`** depuis `.env.example` (ports par défaut)
-3. **Génère le `docker-compose.yml`** via `install.sh` en mode CI (tous les services)
+3. **Génère le `docker-compose.yml`** via `install.sh` en mode CI
 4. **Valide la syntaxe** YAML du compose
-5. **Vérifie** que tous les services sont bien définis
-6. **Démarre** tous les conteneurs
-7. **Teste** chaque endpoint HTTP
-8. **Committe `TEST-REPORT.md`** dans le repo avec les résultats
+5. **Démarre** tous les conteneurs
+6. **Teste** chaque endpoint HTTP
+7. **Committe `TEST-REPORT.md`** dans le repo avec les résultats
 
 → [Voir le dernier TEST-REPORT.md](./TEST-REPORT.md)
+
+### Workflow ARM64
+
+Tourne sur `ubuntu-24.04-arm` (runner GitHub-hosted ARM64 natif).
+
+Identique au workflow x86 avec les adaptations suivantes :
+- **llama-swap** : tag `:latest` multi-arch (`:cpu` est x86-only)
+- **ComfyUI** : service placeholder `alpine` (pas d'image CPU ARM64 disponible) — optionnel
+- **llama.cpp** : optimisations NEON/SVE ARM64 actives automatiquement
+- Committe **`TEST-REPORT-arm64.md`** séparément
+
+→ [Voir le dernier TEST-REPORT-arm64.md](./TEST-REPORT-arm64.md)
 
 ---
 
@@ -249,13 +266,15 @@ Détection automatique au lancement :
 
 ```
 TinAI/
-├── install.sh                  ← installateur principal
-├── tinai                       ← CLI de gestion
-├── .env.example                ← configuration (ports, répertoires, modèle)
-├── TEST-REPORT.md              ← rapport du dernier run CI
+├── install.sh                       ← installateur principal
+├── tinai                            ← CLI de gestion
+├── .env.example                     ← configuration (ports, répertoires, modèle)
+├── TEST-REPORT.md                   ← rapport du dernier run CI x86_64
+├── TEST-REPORT-arm64.md             ← rapport du dernier run CI ARM64
 └── .github/
     └── workflows/
-        └── docker‑ci‑test‑report.yml
+        ├── docker‑ci‑test‑report.yml        ← CI x86_64
+        └── docker‑ci‑test‑report‑arm64.yml  ← CI ARM64
 ```
 
 ---
