@@ -102,12 +102,12 @@ jobs:
             echo "✅ ${i}s"
           }
           wait_for "Open-WebUI   (3000)"  "http://127.0.0.1:3000/"              120 || true
-          wait_for "SillyTavern  (8008)"  "http://127.0.0.1:8008/api/ping"      240 || true
+          wait_for "SillyTavern  (8008)"  "http://127.0.0.1:8008/"              240 || true
           wait_for "Code-Server  (8080)"  "http://127.0.0.1:8080/"              120 || true
           wait_for "Embeddings   (8084)"  "http://127.0.0.1:8084/health"         90 || true
           wait_for "Qdrant       (6333)"  "http://127.0.0.1:6333/healthz"        60 || true
           wait_for "Vision       (8085)"  "http://127.0.0.1:8085/health"        120 || true
-          wait_for "ComfyUI      (7860)"  "http://127.0.0.1:8188/system_stats"  240 || true
+          wait_for "ComfyUI      (7860)"  "http://127.0.0.1:7860/system_stats"  240 || true
           wait_for "llama-swap   (11434)" "http://127.0.0.1:11434/health"        60 || true
           wait_for "Caddy        (80)"    "http://127.0.0.1:80/"                 60 || true
           wait_for "Filebrowser  (8083)"  "http://127.0.0.1:8083/"               60 || true
@@ -130,24 +130,24 @@ jobs:
               ROWS+="| $name | ✅ OK | \`$url\` |\n"
             else
               ROWS+="| $name | ❌ FAIL | \`$url\` |\n"
-              [ "$required" = "true" ] && FAILED=true
+              if [ "$required" = "true" ]; then FAILED=true; fi
             fi
           }
 
           # Services critiques (font échouer le CI)
-          check "Open-WebUI (3000)"    "http://127.0.0.1:3000/"           true
-          check "SillyTavern (8008)"   "http://127.0.0.1:8008/api/ping"   true
-          check "Code-Server (8080)"   "http://127.0.0.1:8080/"           true
-          check "Embeddings (8084)"    "http://127.0.0.1:8084/health"     true
-          check "Qdrant (6333)"        "http://127.0.0.1:6333/healthz"    true
-          check "Vision (8085)"        "http://127.0.0.1:8085/health"     true
-          check "llama-swap (11434)"   "http://127.0.0.1:11434/health"    true
-          check "Caddy (80)"           "http://127.0.0.1:80/"             true
-          check "Filebrowser (8083)"   "http://127.0.0.1:8083/"           true
+          check "Open-WebUI (3000)"    "http://127.0.0.1:3000/"          true
+          check "SillyTavern (8008)"   "http://127.0.0.1:8008/"          true
+          check "Code-Server (8080)"   "http://127.0.0.1:8080/"          true
+          check "Embeddings (8084)"    "http://127.0.0.1:8084/health"    true
+          check "Qdrant (6333)"        "http://127.0.0.1:6333/healthz"   true
+          check "Vision (8085)"        "http://127.0.0.1:8085/health"    true
+          check "llama-swap (11434)"   "http://127.0.0.1:11434/health"   true
+          check "Caddy (80)"           "http://127.0.0.1:80/"            true
+          check "Filebrowser (8083)"   "http://127.0.0.1:8083/"          true
 
           # Services optionnels (loggés mais ne font pas échouer le CI)
-          check "OpenFang (4200)"      "http://127.0.0.1:4200/"           false
-          check "ComfyUI (8188)"       "http://127.0.0.1:8188/system_stats" false
+          check "OpenFang (4200)"      "http://127.0.0.1:4200/"               false
+          check "ComfyUI (7860)"       "http://127.0.0.1:7860/system_stats"   false
 
           # llama-server : conteneur actif (modèle téléchargé au 1er run)
           if docker ps --format '{{.Names}}' | grep -q "tinai-llama"; then
@@ -207,7 +207,11 @@ jobs:
           REPORT
 
           cat TEST-REPORT.md
-          $FAILED && echo "failed=true" >> $GITHUB_OUTPUT || echo "failed=false" >> $GITHUB_OUTPUT
+          if [ "$FAILED" = "true" ]; then
+            echo "failed=true" >> $GITHUB_OUTPUT
+          else
+            echo "failed=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Upload TEST-REPORT artifact
         uses: actions/upload-artifact@v4
