@@ -65,20 +65,15 @@ jobs:
 
       - name: Patch docker-compose.yml for ARM64
         run: |
-          # ComfyUI : yanwk/comfyui-boot:cpu est x86-only → on le remplace par
-          # un conteneur alpine inerte (sleep infinity) pour garder le service déclaré
+          # ComfyUI : yanwk/comfyui-boot:cpu est x86-only
+          # Remplacer image par alpine + entrypoint sleep + healthcheck trivial
           sed -i 's|yanwk/comfyui-boot:cpu|alpine:latest|g' TinAI/docker-compose.yml
-          # Remplacer le healthcheck comfyui par un check trivial (alpine n'a pas curl ni node)
-          # et ajouter une commande de démarrage
-          sed -i '/container_name: tinai-comfyui/,/healthcheck:/{
-            /healthcheck:/a\      command: ["sh", "-c", "sleep infinity"]
-          }' TinAI/docker-compose.yml || true
-          # Simplifier le healthcheck comfyui pour alpine
-          sed -i '/container_name: tinai-comfyui/,/start_period:/{
-            s|test:.*|test: ["CMD", "true"]|
-          }' TinAI/docker-compose.yml || true
-          echo "✅ Patch ComfyUI ARM64 appliqué (alpine placeholder)"
-          grep -A 8 "container_name: tinai-comfyui" TinAI/docker-compose.yml || true
+          # entrypoint au niveau SERVICE (pas sous healthcheck)
+          sed -i '/container_name: tinai-comfyui/a\    entrypoint: ["sh", "-c", "sleep infinity"]' TinAI/docker-compose.yml
+          # Remplacer test: du healthcheck comfyui (alpine sans curl)
+          sed -i '/container_name: tinai-comfyui/,/test:/{s|test:.*|test: ["CMD", "true"]|}' TinAI/docker-compose.yml
+          echo "Patch ComfyUI ARM64 applique"
+          grep -A 14 "container_name: tinai-comfyui" TinAI/docker-compose.yml || true
 
       - name: Install tinai CLI
         run: |
@@ -142,8 +137,9 @@ jobs:
       - name: Debug – logs des services lents
         if: always()
         run: |
-          echo "=== SillyTavern ==" && docker logs tinai-sillytavern --tail=80 2>&1 || true
-          echo "=== llama-swap ==" && docker logs tinai-swap --tail=20 2>&1 || true
+          echo "=== SillyTavern (premiers logs) ==" && docker logs tinai-sillytavern 2>&1 | head -60 || true
+          echo "=== SillyTavern (derniers logs) ==" && docker logs tinai-sillytavern --tail=20 2>&1 || true
+          echo "=== llama-swap ===" && docker logs tinai-swap --tail=20 2>&1 || true
 
       - name: Run functional tests
         id: tests
