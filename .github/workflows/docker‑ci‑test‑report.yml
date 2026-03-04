@@ -20,8 +20,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/openfang-image.tar
-          key: openfang-image-${{ hashFiles('openfang-version.txt') }}
-          restore-keys: openfang-image-
+          key: openfang-image-x86-${{ hashFiles('openfang-version-x86.txt') }}
+          restore-keys: openfang-image-x86-
 
       - name: Build or restore OpenFang image
         run: |
@@ -32,7 +32,7 @@ jobs:
           else
             echo "🔨 Compilation OpenFang depuis le source..."
             git clone --depth=1 https://github.com/RightNow-AI/openfang.git /tmp/openfang
-            git -C /tmp/openfang rev-parse HEAD > openfang-version.txt
+            git -C /tmp/openfang rev-parse HEAD > openfang-version-x86.txt
             docker build -t tinai-openfang:latest /tmp/openfang
             docker save tinai-openfang:latest -o /tmp/openfang-image.tar
             echo "✅ Image buildée et mise en cache"
@@ -226,7 +226,7 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "🧪 CI v2 #${{ github.run_number }} – TEST-REPORT"
-          file_pattern: TEST-REPORT.md openfang-version.txt
+          file_pattern: TEST-REPORT.md openfang-version-x86.txt
 
       - name: Fail on test failures
         if: steps.tests.outputs.failed == 'true'
