@@ -152,6 +152,18 @@ fi
 mkdir -p TinAI && cd TinAI
 mkdir -p "${MODELS_DIR}" "${PROJECTS_DIR}" "${COMFYUI_MODELS_DIR}" "${COMFYUI_OUTPUT_DIR}"
 
+# ── Config SillyTavern (whitelist désactivée) ──────────────────
+mkdir -p sillytavern-config
+if [ ! -f sillytavern-config/config.yaml ]; then
+cat > sillytavern-config/config.yaml << 'STCONFIG'
+whitelistMode: false
+basicAuthMode: false
+listen: true
+listenAddress: 0.0.0.0
+port: 8000
+STCONFIG
+fi
+
 # ════════════════════════════════════════════════════════════════
 #  Génération du docker-compose.yml
 # ════════════════════════════════════════════════════════════════
@@ -218,17 +230,16 @@ cat >> docker-compose.yml << SILLY
     ports: ["${PORT_SILLYTAVERN}:8000"]
     volumes:
       - sillytavern-data:/home/node/app/data
-      - sillytavern-config:/home/node/app/config
+      - ./sillytavern-config:/home/node/app/config
     environment:
       - SILLYTAVERN_HEARTBEATINTERVAL=30
-      - SILLYTAVERN_WHITELISTMODE=false
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "src/healthcheck.js"]
-      interval: 30s
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/"]
+      interval: 15s
       timeout: 10s
-      retries: 3
-      start_period: 30s
+      retries: 10
+      start_period: 60s
 SILLY
 fi
 
@@ -505,7 +516,6 @@ cat >> docker-compose.yml << VOLUMES
 volumes:
   open-webui-data:
   sillytavern-data:
-  sillytavern-config:
   code-data:
   qdrant-data:
   caddy-data:
