@@ -178,8 +178,8 @@ cat >> docker-compose.yml << BASE
       test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 120s
+      retries: 10
+      start_period: 300s
     deploy:
       resources:
         limits:
@@ -199,7 +199,7 @@ cat >> docker-compose.yml << WEBUI
       - OPENAI_API_KEY=${TINAI_API_KEY}
     depends_on:
       llama-server:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/"]
@@ -271,7 +271,7 @@ cat >> docker-compose.yml << AIDER
       - AIDER_MODEL=${AIDER_MODEL}
     depends_on:
       llama-server:
-        condition: service_healthy
+        condition: service_started
     restart: on-failure
 AIDER
 fi
@@ -304,7 +304,7 @@ cat >> docker-compose.yml << FANG
       - OPENFANG_CONFIG=/etc/openfang/openfang.toml
     depends_on:
       llama-server:
-        condition: service_healthy
+        condition: service_started
     restart: on-failure
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4200/"]
