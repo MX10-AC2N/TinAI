@@ -1,8 +1,8 @@
 ## 🧪 TinAI v2 – Test Report
 
-**Date :** 2026-03-04 07:34 UTC
-**Run :** [#19](https://github.com/MX10-AC2N/TinAI/actions/runs/22659113166)
-**Commit :** `5e40ed7117941266bfbbe3761f3f22a8dd8f9316`
+**Date :** 2026-03-04 20:52 UTC
+**Run :** [#21](https://github.com/MX10-AC2N/TinAI/actions/runs/22688035277)
+**Commit :** `0107ac47951ceda69a639ef8fe79299ac8e59eba`
 **Branch :** `main`
 
 ### Résultats
@@ -27,20 +27,20 @@
 ### État des conteneurs
 
 ```
-NAME                IMAGE                                    COMMAND                  SERVICE        CREATED         STATUS                          PORTS
-tinai-aider         paulgauthier/aider:latest                "/bin/sh -c 'tail -f…"   aider          5 minutes ago   Up 5 minutes                    
-tinai-caddy         caddy:alpine                             "caddy run --config …"   caddy          5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp, 443/udp, 2019/tcp
-tinai-code          ghcr.io/coder/code-server:latest         "/usr/bin/entrypoint…"   code-server    5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
-tinai-comfyui       yanwk/comfyui-boot:cpu                   "bash /runner-script…"   comfyui        5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:7860->8188/tcp, [::]:7860->8188/tcp
-tinai-embeddings    ghcr.io/ggml-org/llama.cpp:server        "/app/llama-server -…"   embeddings     5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:8084->8084/tcp, [::]:8084->8084/tcp
-tinai-filebrowser   filebrowser/filebrowser:latest           "tini -- /init.sh"       filebrowser    5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:8083->80/tcp, [::]:8083->80/tcp
-tinai-llama         ghcr.io/ggml-org/llama.cpp:server        "/app/llama-server -…"   llama-server   5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:8081->8081/tcp, [::]:8081->8081/tcp
-tinai-openfang      tinai-openfang:latest                    "openfang start"         openfang       5 minutes ago   Up 5 minutes (unhealthy)        0.0.0.0:4200->4200/tcp, [::]:4200->4200/tcp
-tinai-qdrant        qdrant/qdrant:latest                     "./entrypoint.sh"        qdrant         5 minutes ago   Up 5 minutes (unhealthy)        0.0.0.0:6333-6334->6333-6334/tcp, [::]:6333-6334->6333-6334/tcp
-tinai-sillytavern   ghcr.io/sillytavern/sillytavern:latest   "tini -- ./docker-en…"   sillytavern    5 minutes ago   Restarting (1) 28 seconds ago   
-tinai-swap          ghcr.io/mostlygeek/llama-swap:cpu        "/app/llama-swap -co…"   llama-swap     5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:11434->8080/tcp, [::]:11434->8080/tcp
-tinai-vision        ghcr.io/ggml-org/llama.cpp:server        "/app/llama-server -…"   vision         5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:8085->8085/tcp, [::]:8085->8085/tcp
-tinai-webui         ghcr.io/open-webui/open-webui:main       "bash start.sh"          open-webui     5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:3000->8080/tcp, [::]:3000->8080/tcp
+NAME                IMAGE                                     COMMAND                  SERVICE        CREATED         STATUS                          PORTS
+tinai-aider         paulgauthier/aider:latest                 "/bin/sh -c 'tail -f…"   aider          5 minutes ago   Up 5 minutes                    
+tinai-caddy         caddy:alpine                              "caddy run --config …"   caddy          5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp, 443/udp, 2019/tcp
+tinai-code          ghcr.io/coder/code-server:latest          "/usr/bin/entrypoint…"   code-server    5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+tinai-comfyui       yanwk/comfyui-boot:cpu                    "bash /runner-script…"   comfyui        5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:7860->8188/tcp, [::]:7860->8188/tcp
+tinai-embeddings    ghcr.io/ggml-org/llama.cpp:server         "/app/llama-server -…"   embeddings     5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:8084->8084/tcp, [::]:8084->8084/tcp
+tinai-filebrowser   filebrowser/filebrowser:latest            "tini -- /init.sh"       filebrowser    5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:8083->80/tcp, [::]:8083->80/tcp
+tinai-llama         ghcr.io/ggml-org/llama.cpp:server         "/app/llama-server -…"   llama-server   5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:8081->8081/tcp, [::]:8081->8081/tcp
+tinai-openfang      tinai-openfang:latest                     "openfang start"         openfang       5 minutes ago   Up 5 minutes (unhealthy)        0.0.0.0:4200->4200/tcp, [::]:4200->4200/tcp
+tinai-qdrant        qdrant/qdrant:latest                      "./entrypoint.sh"        qdrant         5 minutes ago   Up 5 minutes (unhealthy)        0.0.0.0:6333-6334->6333-6334/tcp, [::]:6333-6334->6333-6334/tcp
+tinai-sillytavern   ghcr.io/sillytavern/sillytavern:release   "tini -- ./docker-en…"   sillytavern    5 minutes ago   Restarting (1) 25 seconds ago   
+tinai-swap          ghcr.io/mostlygeek/llama-swap:cpu         "/app/llama-swap -co…"   llama-swap     5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:11434->8080/tcp, [::]:11434->8080/tcp
+tinai-vision        ghcr.io/ggml-org/llama.cpp:server         "/app/llama-server -…"   vision         5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:8085->8085/tcp, [::]:8085->8085/tcp
+tinai-webui         ghcr.io/open-webui/open-webui:main        "bash start.sh"          open-webui     5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:3000->8080/tcp, [::]:3000->8080/tcp
 ```
 
 ### tinai status
@@ -63,19 +63,19 @@ tinai-webui         ghcr.io/open-webui/open-webui:main       "bash start.sh"    
   [0;32m✅[0m Vision VL      → [0;36mhttp://localhost:8085[0m
 
 [1m💾 Ressources :[0m
-tinai-webui        CPU:  2.93%  MEM:  1.127GiB  /  15.61GiB
-tinai-aider        CPU:  0.00%  MEM:  1.875MiB  /  15.61GiB
-tinai-openfang     CPU:  0.00%  MEM:  4.656MiB  /  15.61GiB
-tinai-qdrant       CPU:  0.04%  MEM:  122.6MiB  /  15.61GiB
-tinai-embeddings   CPU:  0.00%  MEM:  91.41MiB  /  1GiB
-tinai-llama        CPU:  0.00%  MEM:  415.5MiB  /  5.5GiB
-tinai-vision       CPU:  0.00%  MEM:  2.59GiB   /  4GiB
+tinai-webui        CPU:  0.14%  MEM:  1.135GiB  /  15.62GiB
+tinai-openfang     CPU:  0.00%  MEM:  17.32MiB  /  15.62GiB
+tinai-aider        CPU:  0.00%  MEM:  1.766MiB  /  15.62GiB
 tinai-sillytavern  CPU:  0.00%  MEM:  0B        /  0B
-tinai-code         CPU:  0.01%  MEM:  64.8MiB   /  15.61GiB
-tinai-caddy        CPU:  0.00%  MEM:  43.25MiB  /  15.61GiB
-tinai-comfyui      CPU:  0.05%  MEM:  1.286GiB  /  4GiB
-tinai-filebrowser  CPU:  0.78%  MEM:  17.9MiB   /  15.61GiB
-tinai-swap         CPU:  0.00%  MEM:  10.37MiB  /  15.61GiB
+tinai-caddy        CPU:  0.00%  MEM:  13.86MiB  /  15.62GiB
+tinai-comfyui      CPU:  0.06%  MEM:  1.261GiB  /  4GiB
+tinai-embeddings   CPU:  0.00%  MEM:  71.91MiB  /  1GiB
+tinai-swap         CPU:  0.00%  MEM:  10.15MiB  /  15.62GiB
+tinai-vision       CPU:  0.00%  MEM:  3.383GiB  /  4GiB
+tinai-qdrant       CPU:  0.04%  MEM:  88.67MiB  /  15.62GiB
+tinai-code         CPU:  0.03%  MEM:  129.8MiB  /  15.62GiB
+tinai-filebrowser  CPU:  0.00%  MEM:  15.59MiB  /  15.62GiB
+tinai-llama        CPU:  0.00%  MEM:  428.5MiB  /  5.5GiB
 ```
 
 ### Notes
