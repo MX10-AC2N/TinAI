@@ -1,7 +1,7 @@
 # TinAI 🧠
 
 [![CI x86_64](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker%E2%80%91ci%E2%80%91test%E2%80%91report.yml/badge.svg)](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker%E2%80%91ci%E2%80%91test%E2%80%91report.yml)
-[![CI – TinAI v2 Deploy & Test (ARM64)](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker-ci-test-report-arm64.yml/badge.svg)](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker-ci-test-report-arm64.yml)
+[![CI ARM64](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker-ci-test-report-arm64.yml/badge.svg)](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker-ci-test-report-arm64.yml)
 [![TEST-REPORT x86](https://img.shields.io/badge/test--report-x86__64-blue)](./TEST-REPORT.md)
 [![TEST-REPORT ARM64](https://img.shields.io/badge/test--report-arm64-blueviolet)](./TEST-REPORT-arm64.md)
 [![Version](https://img.shields.io/badge/version-2.0.0-green)](https://github.com/MX10-AC2N/TinAI/releases)
@@ -41,10 +41,6 @@ nano .env
 
 Toutes les valeurs sont optionnelles — les défauts fonctionnent out-of-the-box.
 
-```bash
-cp .env.example .env
-```
-
 ### Ports
 
 ```dotenv
@@ -65,8 +61,8 @@ PORT_FILEBROWSER=8083  # Explorateur fichiers
 ### Répertoires
 
 ```dotenv
-MODELS_DIR=./models              # Modèles GGUF
-PROJECTS_DIR=./projects          # Tes projets (VS Code + Aider)
+MODELS_DIR=./models
+PROJECTS_DIR=./projects
 COMFYUI_MODELS_DIR=./comfyui/models
 COMFYUI_OUTPUT_DIR=./comfyui/output
 OPENFANG_CONFIG_DIR=./openfang-config
@@ -82,13 +78,9 @@ LLAMA_THREADS=4
 LLAMA_MEM_LIMIT=5.5g
 ```
 
-> Le `.env` est automatiquement lu par `install.sh` et le CLI `tinai`.
-
 ---
 
 ## Menu interactif
-
-Au lancement, un menu **gum** te permet de cocher exactement ce que tu veux :
 
 ```
 👇 Coche les composants (espace = cocher, entrée = valider)
@@ -112,25 +104,27 @@ Au lancement, un menu **gum** te permet de cocher exactement ce que tu veux :
 
 ## Services disponibles
 
-| Service | Description | Port défaut | RAM |
-|---------|-------------|-------------|-----|
-| **llama-server** | Moteur LLM – Qwen2.5-Coder-3B (base obligatoire) | `8081` | ~3 GB |
+| Service | Description | Port | RAM |
+|---------|-------------|------|-----|
+| **llama-server** | Moteur LLM (base obligatoire) | `8081` | ~3 GB |
 | **Open WebUI** | Frontend chat riche + RAG intégré | `3000` | ~500 MB |
-| **SillyTavern** | Frontend créatif – roleplay, personas, scénarios | `8008` | ~200 MB |
-| **Code-Server** | VS Code dans le navigateur + Continue.dev préconfiguré | `8080` | ~500 MB |
-| **Aider** | Pair programming autonome en CLI | – | ~100 MB |
-| **OpenFang** | Agent OS autonome 24/7 – 7 Hands prêts à l'emploi | `4200` | ~200 MB |
-| **Embeddings** | nomic-embed-text-v1.5 dédié au RAG | `8084` | ~500 MB |
-| **Qdrant** | Base vectorielle pour RAG + dashboard web | `6333` | ~200 MB |
-| **Vision** | LLaVA-Phi-3-mini – analyse d'images + texte | `8085` | ~2.2 GB |
+| **SillyTavern** | Frontend créatif – roleplay, personas | `8008` | ~200 MB |
+| **Code-Server** | VS Code web + Continue.dev | `8080` | ~500 MB |
+| **Aider** | Pair programming autonome CLI | – | ~100 MB |
+| **OpenFang** | Agent OS autonome 24/7 | `4200` | ~200 MB |
+| **Embeddings** | nomic-embed-text-v1.5 pour RAG | `8084` | ~500 MB |
+| **Qdrant** | Base vectorielle + dashboard | `6333` | ~200 MB |
+| **Vision** | LLaVA-Phi-3-mini – images + texte | `8085` | ~2.2 GB |
 | **ComfyUI** | Génération d'images locale (CPU) | `7860` | ~2 GB |
-| **llama-swap** | Switch de modèles à chaud sans redémarrer | `11434` | ~50 MB |
-| **Caddy** | Reverse proxy – URLs propres pour tous les services | `80` | ~30 MB |
-| **Filebrowser** | Explorateur de fichiers web pour `./projects` | `8083` | ~50 MB |
+| **llama-swap** | Switch de modèles à chaud | `11434` | ~50 MB |
+| **Caddy** | Reverse proxy + URLs propres | `80` | ~30 MB |
+| **Filebrowser** | Explorateur de fichiers web | `8083` | ~50 MB |
+
+> **SillyTavern** est un frontend Node.js léger (~200 MB RAM). Il ne fait pas d'inférence LLM : il délègue à llama-server via l'API OpenAI-compatible. La recommandation GPU sur le site officiel concerne l'inférence, pas ST lui-même — il est parfaitement adapté à TinAI.
 
 ---
 
-## Accès rapides après installation
+## Accès rapides
 
 | Service | URL |
 |---------|-----|
@@ -146,98 +140,91 @@ Au lancement, un menu **gum** te permet de cocher exactement ce que tu veux :
 | Qdrant dashboard | http://IP:6333/dashboard |
 | llama-swap | http://IP:11434 |
 
-> Les ports sont ceux par défaut. Si tu les as changés dans `.env`, adapte en conséquence.
-
 ---
 
 ## CLI `tinai`
 
-Installé automatiquement par `install.sh` dans `/usr/local/bin/tinai`.  
-Lit le `.env` automatiquement pour respecter tes ports et paramètres personnalisés.
-
 ```bash
-# État de tous les services + consommation RAM/CPU
-tinai status
-
-# Logs en direct d'un service (menu interactif si omis)
-tinai logs
+tinai status          # État de tous les services + RAM/CPU
+tinai logs            # Logs en direct (menu interactif)
 tinai logs llama-server
-
-# Changer de modèle LLM à chaud
-tinai model
-
-# Mettre à jour toutes les images Docker
-tinai update
-
-# Démarrer / Arrêter / Redémarrer
-tinai start
-tinai stop
-tinai restart
+tinai model           # Changer de modèle LLM à chaud
+tinai update          # Mettre à jour toutes les images Docker
+tinai start / stop / restart
 ```
 
-### `tinai model` – Modèles disponibles
+### Modèles disponibles
 
-| Modèle | Usage | Taille |
-|--------|-------|--------|
-| Qwen2.5-Coder-3B | Coding (défaut) | 2.2 GB |
-| Qwen2.5-Coder-7B | Coding puissant | 4.8 GB |
-| LLaVA-Phi-3-mini | Vision + texte | 2.2 GB |
-| Mistral-7B | Généraliste | 4.1 GB |
-| Phi-3.5-mini | Ultra léger | 2.2 GB |
-| DeepSeek-Coder-1.3B | Micro coding | 0.8 GB |
+| Modèle | Usage | Taille | Notes |
+|--------|-------|--------|-------|
+| Qwen2.5-Coder-3B | Coding (défaut) | 2.2 GB | Bon équilibre perf/RAM |
+| Qwen2.5-Coder-7B | Coding puissant | 4.8 GB | 8 GB RAM min |
+| **Qwen3-0.8B** | Ultra-léger | ~0.5 GB | Idéal Pi/ARM, très rapide |
+| **Qwen3-2B** | Léger polyvalent | ~1.2 GB | Bon choix ARM 4 GB |
+| LLaVA-Phi-3-mini | Vision + texte | 2.2 GB | |
+| Mistral-7B | Généraliste | 4.1 GB | |
+| Phi-3.5-mini | Ultra léger | 2.2 GB | |
+| DeepSeek-Coder-1.3B | Micro coding | 0.8 GB | |
+
+> **Qwen3-0.8B et Qwen3-2B** sont d'excellents choix pour les machines contraintes. Qwen3-0.8B tourne avec 2 GB de RAM, Qwen3-2B avec 4 GB — tous deux très adaptés à l'ARM.
 
 ---
 
 ## Architecture générée
 
-`install.sh` génère dynamiquement un `docker-compose.yml` avec uniquement les services cochés.  
-Rien d'inutile ne tourne.
-
 ```
 TinAI/
 ├── docker-compose.yml        ← généré par install.sh
-├── models/                   ← modèles GGUF téléchargés automatiquement
-├── projects/                 ← tes projets (monté dans VS Code + Aider)
-├── comfyui/
-│   ├── models/               ← modèles ComfyUI
-│   └── output/               ← images générées
+├── models/                   ← modèles GGUF
+├── projects/                 ← tes projets (VS Code + Aider)
+├── comfyui/models/ et output/
 ├── openfang-config/
-│   └── openfang.toml         ← généré si OpenFang sélectionné
-├── Caddyfile                 ← généré si Caddy sélectionné
-└── llama-swap-config.yaml    ← généré si llama-swap sélectionné
+├── Caddyfile                 ← si Caddy sélectionné
+└── llama-swap-config.yaml    ← si llama-swap sélectionné
 ```
 
 ---
 
 ## CI/CD
 
-Deux workflows GitHub Actions tournent en parallèle sur chaque déclenchement manuel :
+Deux workflows déclenchés manuellement (`workflow_dispatch`) :
 
-### Workflow x86_64
+### 🖥️ CI x86_64 — `docker‑ci‑test‑report.yml`
 
-Tourne sur `ubuntu-latest` (runner GitHub-hosted x86_64).
+Runner : `ubuntu-latest`
 
-1. **Compile OpenFang** depuis le source Rust (avec cache entre les runs)
-2. **Initialise le `.env`** depuis `.env.example` (ports par défaut)
-3. **Génère le `docker-compose.yml`** via `install.sh` en mode CI
-4. **Valide la syntaxe** YAML du compose
-5. **Démarre** tous les conteneurs
-6. **Teste** chaque endpoint HTTP
-7. **Committe `TEST-REPORT.md`** dans le repo avec les résultats
+- Build/restore OpenFang depuis source (cache → `openfang-version-x86.txt`)
+- Génère le compose, démarre tous les services, teste chaque endpoint
+- Committe `TEST-REPORT.md` + `openfang-version-x86.txt`
 
-→ [Voir le dernier TEST-REPORT.md](./TEST-REPORT.md)
+→ [TEST-REPORT.md](./TEST-REPORT.md)
 
-### Workflow ARM64
+### 🦾 CI ARM64 — `docker-ci-test-report-arm64.yml`
 
-Tourne sur `ubuntu-24.04-arm` (runner GitHub-hosted ARM64 natif).
+Runner : `ubuntu-24.04-arm` (runner GitHub-hosted ARM64 natif)
 
-Identique au workflow x86 avec les adaptations suivantes :
-- **llama-swap** : tag `:latest` multi-arch (`:cpu` est x86-only)
-- **ComfyUI** : service placeholder `alpine` (pas d'image CPU ARM64 disponible) — optionnel
-- **llama.cpp** : optimisations NEON/SVE ARM64 actives automatiquement
-- Committe **`TEST-REPORT-arm64.md`** séparément
+- Cache séparé → `openfang-version-arm64.txt`
+- **llama-swap** et **ComfyUI** : images x86-only, remplacées par placeholders `alpine` (optionnels dans les tests)
+- llama.cpp avec optimisations NEON/SVE ARM64 natives
+- Committe `TEST-REPORT-arm64.md` + `openfang-version-arm64.txt`
 
-→ [Voir le dernier TEST-REPORT-arm64.md](./TEST-REPORT-arm64.md)
+→ [TEST-REPORT-arm64.md](./TEST-REPORT-arm64.md)
+
+---
+
+## Compatibilité ARM64
+
+| Service | ARM64 | Notes |
+|---------|-------|-------|
+| llama-server | ✅ Natif | Optimisations NEON/SVE |
+| Open WebUI | ✅ | Multi-arch |
+| SillyTavern | ✅ | Node.js, multi-arch |
+| Code-Server | ✅ | Multi-arch |
+| Embeddings, Qdrant, Vision | ✅ | Multi-arch |
+| Aider | ✅ | Python, multi-arch |
+| Caddy, Filebrowser | ✅ | Multi-arch |
+| llama-swap | ⚠️ x86-only | Placeholder alpine en CI ARM64 |
+| ComfyUI | ⚠️ x86-only | Placeholder alpine en CI ARM64 |
 
 ---
 
@@ -245,16 +232,15 @@ Identique au workflow x86 avec les adaptations suivantes :
 
 | RAM | Stack conseillée |
 |-----|-----------------|
-| 4 GB | llama-server + Code-Server |
-| 6 GB | + Open WebUI + Qdrant + Embeddings |
-| 8 GB | + SillyTavern + OpenFang + llama-swap |
-| 12 GB+ | Stack complète avec Vision ou ComfyUI |
+| 2 GB | llama-server (Qwen3-0.8B) seul |
+| 4 GB | + Open WebUI + Qdrant + Embeddings (Qwen3-2B) |
+| 6 GB | + SillyTavern + llama-swap (Qwen2.5-3B) |
+| 8 GB | Stack complète (Qwen2.5-7B) |
+| 12 GB+ | + Vision ou ComfyUI |
 
 ---
 
-## Architecture supportée
-
-Détection automatique au lancement :
+## Architectures supportées
 
 - `x86_64` — PC, serveur, mini PC
 - `aarch64` — Raspberry Pi 4/5, Orange Pi, Radxa
@@ -262,19 +248,20 @@ Détection automatique au lancement :
 
 ---
 
-## Repo
+## Structure du repo
 
 ```
 TinAI/
-├── install.sh                       ← installateur principal
-├── tinai                            ← CLI de gestion
-├── .env.example                     ← configuration (ports, répertoires, modèle)
-├── TEST-REPORT.md                   ← rapport du dernier run CI x86_64
-├── TEST-REPORT-arm64.md             ← rapport du dernier run CI ARM64
-└── .github/
-    └── workflows/
-        ├── docker‑ci‑test‑report.yml        ← CI x86_64
-        └── docker‑ci‑test‑report‑arm64.yml  ← CI ARM64
+├── install.sh
+├── tinai
+├── .env.example
+├── TEST-REPORT.md                  ← dernier run CI x86_64
+├── TEST-REPORT-arm64.md            ← dernier run CI ARM64
+├── openfang-version-x86.txt        ← commit OpenFang x86
+├── openfang-version-arm64.txt      ← commit OpenFang ARM64
+└── .github/workflows/
+    ├── docker‑ci‑test‑report.yml
+    └── docker-ci-test-report-arm64.yml
 ```
 
 ---
