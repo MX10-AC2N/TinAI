@@ -158,9 +158,6 @@ if [ ! -f sillytavern-config/config.yaml ]; then
 cat > sillytavern-config/config.yaml << 'STCONFIG'
 whitelistMode: false
 basicAuthMode: false
-listen: true
-listenAddress: 0.0.0.0
-port: 8000
 STCONFIG
 fi
 
