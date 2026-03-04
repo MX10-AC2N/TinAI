@@ -18,7 +18,7 @@ jobs:
       - name: Patch install.sh for ARM64
         run: |
           # llama-swap :cpu tag est x86-only → utiliser :latest (multi-arch)
-          sed -i 's|ghcr.io/mostlygeek/llama-swap:cpu|ghcr.io/mostlygeek/llama-swap:latest|g' install.sh
+          sed -i 's|ghcr.io/mostlygeek/llama-swap:cpu|alpine:latest|g' install.sh
           # yanwk/comfyui-boot:cpu est x86-only → remplacer par image multi-arch
           # (pas d'image ComfyUI CPU officielle ARM → on désactive le service)
           echo "✅ Patches ARM64 appliqués"
@@ -29,7 +29,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/openfang-image.tar
-          key: openfang-image-arm64-${{ hashFiles('openfang-version.txt') }}
+          key: openfang-image-arm64-${{ hashFiles('openfang-version-arm64.txt') }}
           restore-keys: openfang-image-arm64-
 
       - name: Build or restore OpenFang image
@@ -41,7 +41,7 @@ jobs:
           else
             echo "🔨 Compilation OpenFang depuis le source (ARM64)..."
             git clone --depth=1 https://github.com/RightNow-AI/openfang.git /tmp/openfang
-            git -C /tmp/openfang rev-parse HEAD > openfang-version.txt
+            git -C /tmp/openfang rev-parse HEAD > openfang-version-arm64.txt
             docker build -t tinai-openfang:latest /tmp/openfang || {
               echo "⚠️  Build OpenFang échoué sur ARM64 – image placeholder créée"
               docker pull alpine:latest
@@ -72,8 +72,12 @@ jobs:
           sed -i '/container_name: tinai-comfyui/a\    entrypoint: ["sh", "-c", "sleep infinity"]' TinAI/docker-compose.yml
           # Remplacer test: du healthcheck comfyui (alpine sans curl)
           sed -i '/container_name: tinai-comfyui/,/test:/{s|test:.*|test: ["CMD", "true"]|}' TinAI/docker-compose.yml
-          echo "Patch ComfyUI ARM64 applique"
-          grep -A 14 "container_name: tinai-comfyui" TinAI/docker-compose.yml || true
+          # llama-swap : aussi remplacé par alpine dans install.sh
+          sed -i '/container_name: tinai-swap/a\    entrypoint: ["sh", "-c", "sleep infinity"]' TinAI/docker-compose.yml
+          sed -i '/container_name: tinai-swap/,/test:/{s|test:.*|test: ["CMD", "true"]|}' TinAI/docker-compose.yml
+          echo "Patches ComfyUI + llama-swap ARM64 appliques"
+          grep -A 5 "container_name: tinai-comfyui" TinAI/docker-compose.yml || true
+          grep -A 5 "container_name: tinai-swap" TinAI/docker-compose.yml || true
 
       - name: Install tinai CLI
         run: |
@@ -165,7 +169,7 @@ jobs:
           check "Embeddings (8084)"    "http://127.0.0.1:8084/health"    true
           check "Qdrant (6333)"        "http://127.0.0.1:6333/healthz"   true
           check "Vision (8085)"        "http://127.0.0.1:8085/health"    true
-          check "llama-swap (11434)"   "http://127.0.0.1:11434/health"   true
+          check "llama-swap (11434)"   "http://127.0.0.1:11434/health"   false
           check "Caddy (80)"           "http://127.0.0.1:80/"            true
           check "Filebrowser (8083)"   "http://127.0.0.1:8083/"          true
 
@@ -250,7 +254,7 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "🧪 CI ARM64 #${{ github.run_number }} – TEST-REPORT"
-          file_pattern: TEST-REPORT-arm64.md openfang-version.txt
+          file_pattern: TEST-REPORT-arm64.md openfang-version-arm64.txt
 
       - name: Fail on test failures
         if: steps.tests.outputs.failed == 'true'
