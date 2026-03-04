@@ -1,8 +1,8 @@
 ## 🧪 TinAI v2 – Test Report
 
-**Date :** 2026-03-04 05:58 UTC
-**Run :** [#17](https://github.com/MX10-AC2N/TinAI/actions/runs/22656741656)
-**Commit :** `74c5984592a76fc44e079404f0b320ed2524819f`
+**Date :** 2026-03-04 06:28 UTC
+**Run :** [#18](https://github.com/MX10-AC2N/TinAI/actions/runs/22657439968)
+**Commit :** `49fdf532f486df7a25ddb1c05d4b43d6af655ae3`
 **Branch :** `main`
 
 ### Résultats
@@ -37,7 +37,7 @@ tinai-filebrowser   filebrowser/filebrowser:latest           "tini -- /init.sh" 
 tinai-llama         ghcr.io/ggml-org/llama.cpp:server        "/app/llama-server -…"   llama-server   5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:8081->8081/tcp, [::]:8081->8081/tcp
 tinai-openfang      tinai-openfang:latest                    "openfang start"         openfang       5 minutes ago   Up 4 minutes (unhealthy)        0.0.0.0:4200->4200/tcp, [::]:4200->4200/tcp
 tinai-qdrant        qdrant/qdrant:latest                     "./entrypoint.sh"        qdrant         5 minutes ago   Up 5 minutes (unhealthy)        0.0.0.0:6333-6334->6333-6334/tcp, [::]:6333-6334->6333-6334/tcp
-tinai-sillytavern   ghcr.io/sillytavern/sillytavern:latest   "tini -- ./docker-en…"   sillytavern    5 minutes ago   Restarting (1) 24 seconds ago   
+tinai-sillytavern   ghcr.io/sillytavern/sillytavern:latest   "tini -- ./docker-en…"   sillytavern    5 minutes ago   Restarting (1) 20 seconds ago   
 tinai-swap          ghcr.io/mostlygeek/llama-swap:cpu        "/app/llama-swap -co…"   llama-swap     5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:11434->8080/tcp, [::]:11434->8080/tcp
 tinai-vision        ghcr.io/ggml-org/llama.cpp:server        "/app/llama-server -…"   vision         5 minutes ago   Up 5 minutes (healthy)          0.0.0.0:8085->8085/tcp, [::]:8085->8085/tcp
 tinai-webui         ghcr.io/open-webui/open-webui:main       "bash start.sh"          open-webui     5 minutes ago   Up 4 minutes (healthy)          0.0.0.0:3000->8080/tcp, [::]:3000->8080/tcp
@@ -63,19 +63,19 @@ tinai-webui         ghcr.io/open-webui/open-webui:main       "bash start.sh"    
   [0;32m✅[0m Vision VL      → [0;36mhttp://localhost:8085[0m
 
 [1m💾 Ressources :[0m
-tinai-webui        CPU:  0.11%  MEM:  1.126GiB  /  15.62GiB
-tinai-aider        CPU:  0.00%  MEM:  1.785MiB  /  15.62GiB
-tinai-openfang     CPU:  0.00%  MEM:  4.602MiB  /  15.62GiB
-tinai-code         CPU:  0.00%  MEM:  100.2MiB  /  15.62GiB
-tinai-llama        CPU:  2.64%  MEM:  1.969GiB  /  5.5GiB
-tinai-comfyui      CPU:  0.05%  MEM:  1.255GiB  /  4GiB
-tinai-filebrowser  CPU:  0.00%  MEM:  15.05MiB  /  15.62GiB
-tinai-caddy        CPU:  0.00%  MEM:  14.07MiB  /  15.62GiB
-tinai-vision       CPU:  0.00%  MEM:  1.696GiB  /  4GiB
-tinai-qdrant       CPU:  0.03%  MEM:  122.8MiB  /  15.62GiB
+tinai-webui        CPU:  0.14%  MEM:  1.111GiB  /  15.62GiB
+tinai-openfang     CPU:  0.00%  MEM:  4.551MiB  /  15.62GiB
+tinai-aider        CPU:  0.00%  MEM:  1.789MiB  /  15.62GiB
+tinai-swap         CPU:  0.00%  MEM:  12.19MiB  /  15.62GiB
 tinai-sillytavern  CPU:  0.00%  MEM:  0B        /  0B
-tinai-swap         CPU:  0.00%  MEM:  10.67MiB  /  15.62GiB
-tinai-embeddings   CPU:  0.00%  MEM:  89.47MiB  /  1GiB
+tinai-llama        CPU:  0.00%  MEM:  413.3MiB  /  5.5GiB
+tinai-vision       CPU:  0.00%  MEM:  1.83GiB   /  4GiB
+tinai-embeddings   CPU:  0.00%  MEM:  79.02MiB  /  1GiB
+tinai-code         CPU:  0.00%  MEM:  124.1MiB  /  15.62GiB
+tinai-caddy        CPU:  0.00%  MEM:  37.41MiB  /  15.62GiB
+tinai-comfyui      CPU:  0.06%  MEM:  1.228GiB  /  4GiB
+tinai-qdrant       CPU:  0.04%  MEM:  104.5MiB  /  15.62GiB
+tinai-filebrowser  CPU:  0.00%  MEM:  14.68MiB  /  15.62GiB
 ```
 
 ### Notes
