@@ -223,10 +223,18 @@ jobs:
 
       - name: Commit TEST-REPORT.md
         if: always()
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "🧪 CI v2 #${{ github.run_number }} – TEST-REPORT"
-          file_pattern: TEST-REPORT.md openfang-version-x86.txt
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add TEST-REPORT.md openfang-version-x86.txt || true
+          git diff --cached --quiet && echo "Rien à commiter" && exit 0
+          git commit -m "🧪 CI x86 #${{ github.run_number }} – TEST-REPORT"
+          # Retry avec rebase en cas de conflit de push (workflows parallèles)
+          for i in 1 2 3; do
+            git push && break
+            echo "Push échoué (tentative $i/3) – pull --rebase puis retry..."
+            git pull --rebase origin main
+          done
 
       - name: Fail on test failures
         if: steps.tests.outputs.failed == 'true'
