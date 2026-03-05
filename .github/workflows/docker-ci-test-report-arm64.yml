@@ -131,9 +131,9 @@ jobs:
           wait_for "Open-WebUI   (3000)"  "http://127.0.0.1:3000/"              120 || true
           wait_for "SillyTavern  (8008)"  "http://127.0.0.1:8008/"              240 || true
           wait_for "Code-Server  (8080)"  "http://127.0.0.1:8080/"              120 || true
-          wait_for "Embeddings   (8084)"  "http://127.0.0.1:8084/health"         90 || true
+          wait_for "Embeddings   (8084)"  "http://127.0.0.1:8084/health"        180 || true
           wait_for "Qdrant       (6333)"  "http://127.0.0.1:6333/healthz"        60 || true
-          wait_for "Vision       (8085)"  "http://127.0.0.1:8085/health"        120 || true
+          wait_for "Vision       (8085)"  "http://127.0.0.1:8085/health"        240 || true
           wait_for "llama-swap   (11434)" "http://127.0.0.1:11434/health"        90 || true
           wait_for "Caddy        (80)"    "http://127.0.0.1:80/"                 60 || true
           wait_for "Filebrowser  (8083)"  "http://127.0.0.1:8083/"               60 || true
@@ -251,10 +251,18 @@ jobs:
 
       - name: Commit TEST-REPORT-arm64.md
         if: always()
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "🧪 CI ARM64 #${{ github.run_number }} – TEST-REPORT"
-          file_pattern: TEST-REPORT-arm64.md openfang-version-arm64.txt
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add TEST-REPORT-arm64.md openfang-version-arm64.txt || true
+          git diff --cached --quiet && echo "Rien à commiter" && exit 0
+          git commit -m "🧪 CI ARM64 #${{ github.run_number }} – TEST-REPORT"
+          # Retry avec rebase en cas de conflit de push (workflows parallèles)
+          for i in 1 2 3; do
+            git push && break
+            echo "Push échoué (tentative $i/3) – pull --rebase puis retry..."
+            git pull --rebase origin main
+          done
 
       - name: Fail on test failures
         if: steps.tests.outputs.failed == 'true'
