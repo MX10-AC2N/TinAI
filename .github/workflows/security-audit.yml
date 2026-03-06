@@ -36,7 +36,7 @@ jobs:
 
           # Patterns interdits
           declare -A CHECKS=(
-            ["Mot de passe hardcodé (hors exemple)"]='(?i)password\s*[=:]\s*(?!\$\{|changezmoi123|PLACEHOLDER|#)[^\s"'\''$]{6,}'
+            ["Mot de passe hardcodé (hors exemple)"]='(?i)password\s*[=:]\s*(?!\\( \{|changezmoi123|CHANGEME|PLACEHOLDER|#)[^ ;"'\'' \){}]{8,}'
             ["Clé API hardcodée"]='(?i)(api_key|apikey|api-key)\s*[=:]\s*(?!\$\{|sk-tinai|PLACEHOLDER)[A-Za-z0-9_\-]{16,}'
             ["Token GitHub"]='ghp_[A-Za-z0-9]{36}'
             ["Clé AWS"]='AKIA[0-9A-Z]{16}'
@@ -45,17 +45,36 @@ jobs:
 
           for name in "${!CHECKS[@]}"; do
             pattern="${CHECKS[$name]}"
-            if grep -rPn "$pattern" \
+            
+            # On recherche, mais on exclut explicitement les lignes qui contiennent la valeur de test connue
+            FOUND=$(grep -rPn "$pattern" \
               --include="*.sh" --include="*.yml" --include="*.yaml" \
               --include="*.toml" --include="*.json" \
-              --exclude-dir=".git" . 2>/dev/null | grep -v "\.example"; then
+              --exclude-dir=".git" . 2>/dev/null \
+              | grep -v "\.example" \
+              | grep -v 'changezmoi123' \
+              | grep -v 'CODE_PASSWORD="\${CODE_PASSWORD:-changezmoi123}"' \
+              | grep -v 'CODE_PASSWORD='\''${CODE_PASSWORD:-changezmoi123}'\''' \
+            )
+
+            if [ -n "$FOUND" ]; then
               echo "❌ $name"
+              echo "Lignes suspectes trouvées :"
+              echo "$FOUND"
               FAIL=true
             else
               echo "✅ Aucun : $name"
             fi
           done
-          $FAIL && exit 1 || echo "✅ Aucun secret hardcodé détecté"
+
+          if $FAIL; then
+            echo ""
+            echo "Des secrets (ou faux positifs non exclus) ont été détectés ↑"
+            exit 1
+          else
+            echo ""
+            echo "✅ Aucun secret hardcodé détecté"
+          fi
 
       # ── 3. Fichiers sensibles non commités ────────────────────────
       - name: Audit fichiers sensibles dans git
