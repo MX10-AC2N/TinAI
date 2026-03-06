@@ -1,0 +1,11 @@
+FROM golang:1.23-bookworm AS builder
+RUN git clone --depth=1 https://github.com/mostlygeek/llama-swap /src
+WORKDIR /src
+RUN CGO_ENABLED=0 GOARCH=arm64 go build -ldflags="-s -w" -o /llama-swap .
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /llama-swap /usr/local/bin/llama-swap
+ENTRYPOINT ["/usr/local/bin/llama-swap"]
