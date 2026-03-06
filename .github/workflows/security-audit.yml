@@ -34,19 +34,19 @@ jobs:
           FAIL=false
           echo "🔍 Recherche de secrets dans les fichiers sources..."
 
-          # Patterns interdits
+          # Patterns interdits (regex valides pour grep -P)
           declare -A CHECKS=(
-            ["Mot de passe hardcodé (hors exemple)"]='(?i)password\s*[=:]\s*(?!\\( \{|changezmoi123|CHANGEME|PLACEHOLDER|#)[^ ;"'\'' \){}]{8,}'
-            ["Clé API hardcodée"]='(?i)(api_key|apikey|api-key)\s*[=:]\s*(?!\$\{|sk-tinai|PLACEHOLDER)[A-Za-z0-9_\-]{16,}'
-            ["Token GitHub"]='ghp_[A-Za-z0-9]{36}'
-            ["Clé AWS"]='AKIA[0-9A-Z]{16}'
             ["Clé privée SSH/TLS"]='-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY'
+            ["Clé AWS"]='AKIA[0-9A-Z]{16}'
+            ["Token GitHub"]='ghp_[A-Za-z0-9]{36}'
+            ["Clé API hardcodée"]='(?i)(api_key|apikey|api-key)\s*[=:]\s*(?!\$\{|sk-tinai|PLACEHOLDER)[A-Za-z0-9_\-]{16,}'
+            ["Mot de passe hardcodé (hors exemple)"]='(?i)password\s*[=:]\s*(?!\\( \{|changezmoi123|CHANGEME|PLACEHOLDER|#)[^ ;"'\'' \){}]{8,}'
           )
 
           for name in "${!CHECKS[@]}"; do
             pattern="${CHECKS[$name]}"
             
-            # On recherche, mais on exclut explicitement les lignes qui contiennent la valeur de test connue
+            # Recherche avec exclusions pour ignorer les faux positifs exacts
             FOUND=$(grep -rPn "$pattern" \
               --include="*.sh" --include="*.yml" --include="*.yaml" \
               --include="*.toml" --include="*.json" \
@@ -54,7 +54,7 @@ jobs:
               | grep -v "\.example" \
               | grep -v 'changezmoi123' \
               | grep -v 'CODE_PASSWORD="\${CODE_PASSWORD:-changezmoi123}"' \
-              | grep -v 'CODE_PASSWORD='\''${CODE_PASSWORD:-changezmoi123}'\''' \
+              | grep -v "CODE_PASSWORD='\\${CODE_PASSWORD:-changezmoi123}'" \
             )
 
             if [ -n "$FOUND" ]; then
@@ -69,7 +69,7 @@ jobs:
 
           if $FAIL; then
             echo ""
-            echo "Des secrets (ou faux positifs non exclus) ont été détectés ↑"
+            echo "❌ Des secrets (ou faux positifs non exclus) ont été détectés – voir ci-dessus ↑"
             exit 1
           else
             echo ""
