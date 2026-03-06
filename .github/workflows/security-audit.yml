@@ -41,10 +41,8 @@ jobs:
             ["Clé API hardcodée"]='(?i)(api_key|apikey|api-key)\s*[=:]\s*(?!\$\{|sk-tinai|PLACEHOLDER)[A-Za-z0-9_\-]{16,}'
             ["Mot de passe hardcodé (hors exemple)"]='(?i)password\s*[=:]\s*(?!\\( \{|changezmoi123|CHANGEME|PLACEHOLDER|#)[^ ;"'\'' \){}]{8,}'
           )
-
           for name in "${!CHECKS[@]}"; do
             pattern="${CHECKS[$name]}"
-            
             # Recherche avec exclusions pour ignorer les faux positifs exacts
             FOUND=$(grep -rPn "$pattern" \
               --include="*.sh" --include="*.yml" --include="*.yaml" \
@@ -55,7 +53,6 @@ jobs:
               | grep -v 'CODE_PASSWORD="\${CODE_PASSWORD:-changezmoi123}"' \
               | grep -v "CODE_PASSWORD='\\${CODE_PASSWORD:-changezmoi123}'" \
             )
-
             if [ -n "$FOUND" ]; then
               echo "❌ $name"
               echo "Lignes suspectes trouvées :"
@@ -65,7 +62,6 @@ jobs:
               echo "✅ Aucun : $name"
             fi
           done
-
           if $FAIL; then
             echo ""
             echo "❌ Des secrets (ou faux positifs non exclus) ont été détectés – voir ci-dessus ↑"
