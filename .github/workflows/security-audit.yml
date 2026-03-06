@@ -33,7 +33,6 @@ jobs:
         run: |
           FAIL=false
           echo "🔍 Recherche de secrets dans les fichiers sources..."
-
           # Patterns interdits (regex valides pour grep -P)
           declare -A CHECKS=(
             ["Clé privée SSH/TLS"]='-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY'
