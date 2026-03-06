@@ -36,7 +36,7 @@ jobs:
 
           # Patterns interdits
           declare -A CHECKS=(
-            ["Mot de passe hardcodé (hors exemple)"]='(?i)password\s*[=:]\s*(?!\$\{|changezmoi|PLACEHOLDER|#)[^\s"'\''$]{6,}'
+            ["Mot de passe hardcodé (hors exemple)"]='(?i)password\s*[=:]\s*(?!\$\{|changezmoi123|PLACEHOLDER|#)[^\s"'\''$]{6,}'
             ["Clé API hardcodée"]='(?i)(api_key|apikey|api-key)\s*[=:]\s*(?!\$\{|sk-tinai|PLACEHOLDER)[A-Za-z0-9_\-]{16,}'
             ["Token GitHub"]='ghp_[A-Za-z0-9]{36}'
             ["Clé AWS"]='AKIA[0-9A-Z]{16}'
