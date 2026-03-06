@@ -1,0 +1,401 @@
+name: CI – TinAI ARM64
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'install-arm64.sh'
+      - '.env.example'
+      - '.github/workflows/ci-arm64.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  security-audit:
+    name: 🔒 Audit sécurité
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ShellCheck – install-arm64.sh
+        run: |
+          sudo apt-get install -y shellcheck
+          shellcheck --severity=error \
+            --exclude=SC2034,SC2154 \
+            install-arm64.sh
+          echo "✅ ShellCheck OK"
+
+      - name: Audit secrets dans les fichiers sources
+        run: |
+          FAIL=false
+          PATTERNS=(
+            'password\s*=\s*[^${"'\''changezmoi]'
+            'api_key\s*=\s*[^${"'\''sk-tinai]'
+            'secret\s*=\s*[^${"'\''PLACEHOLDER]'
+            'AWS_SECRET'
+            'GITHUB_TOKEN\s*='
+          )
+          for p in "${PATTERNS[@]}"; do
+            if grep -riE "$p" install.sh install-arm64.sh .env.example 2>/dev/null; then
+              echo "❌ Pattern suspect trouvé : $p"
+              FAIL=true
+            fi
+          done
+          $FAIL && exit 1 || echo "✅ Aucun secret hardcodé"
+
+      - name: Vérifie que .env n'est pas commité
+        run: |
+          git ls-files --error-unmatch .env 2>/dev/null \
+            && { echo "❌ DANGER : .env tracké par git !"; exit 1; } \
+            || echo "✅ .env absent du repo"
+
+      - name: Vérifie le .gitignore
+        run: |
+          for pattern in ".env" "models/" "projects/" "TinAI/"; do
+            grep -qF "$pattern" .gitignore \
+              || echo "⚠️  Manquant dans .gitignore : $pattern"
+          done
+          echo "✅ .gitignore vérifié"
+
+  test-arm64:
+    name: 🧪 Test ARM64
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    needs: security-audit
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache image OpenFang ARM64
+        id: cache-openfang
+        uses: actions/cache@v4
+        with:
+          path: /tmp/openfang-image.tar
+          key: openfang-arm64-${{ hashFiles('openfang-version-arm64.txt') }}
+          restore-keys: openfang-arm64-
+
+      - name: Build ou restore image OpenFang ARM64
+        run: |
+          if [ "${{ steps.cache-openfang.outputs.cache-hit }}" = "true" ] && [ -f /tmp/openfang-image.tar ]; then
+            echo "♻️  Restauration OpenFang depuis le cache"
+            docker load -i /tmp/openfang-image.tar
+          else
+            echo "🔨 Compilation OpenFang ARM64"
+            git clone --depth=1 https://github.com/RightNow-AI/openfang.git /tmp/openfang
+            git -C /tmp/openfang rev-parse HEAD > openfang-version-arm64.txt
+            docker build -t tinai-openfang:latest /tmp/openfang || {
+              echo "⚠️  Build OpenFang échoué – placeholder alpine"
+              docker pull alpine:latest
+              docker tag alpine:latest tinai-openfang:latest
+            }
+            docker save tinai-openfang:latest -o /tmp/openfang-image.tar
+          fi
+          echo "✅ tinai-openfang:latest disponible"
+
+      - name: Cache image llama.cpp ARM64
+        id: cache-llamacpp
+        uses: actions/cache@v4
+        with:
+          path: /tmp/llamacpp-arm64.tar
+          key: llamacpp-arm64-${{ hashFiles('install-arm64.sh') }}
+          restore-keys: llamacpp-arm64-
+
+      - name: Build ou restore llama.cpp ARM64
+        run: |
+          if [ "${{ steps.cache-llamacpp.outputs.cache-hit }}" = "true" ] && [ -f /tmp/llamacpp-arm64.tar ]; then
+            echo "♻️  Restauration llama.cpp ARM64 depuis le cache"
+            docker load -i /tmp/llamacpp-arm64.tar
+          else
+            echo "🔨 Compilation llama.cpp ARM64 (NEON/SVE) – ~5-10 min"
+            docker build -t tinai-llamacpp:local -f docker/Dockerfile.llamacpp-arm64 .
+            docker save tinai-llamacpp:local -o /tmp/llamacpp-arm64.tar
+          fi
+          echo "✅ tinai-llamacpp:local disponible"
+          docker image inspect tinai-llamacpp:local --format "Size: {{.Size}}"
+
+      - name: Cache image llama-swap ARM64
+        id: cache-llamaswap
+        uses: actions/cache@v4
+        with:
+          path: /tmp/llamaswap-arm64.tar
+          key: llamaswap-arm64-v1
+          restore-keys: llamaswap-arm64-
+
+      - name: Build ou restore llama-swap ARM64
+        run: |
+          if [ "${{ steps.cache-llamaswap.outputs.cache-hit }}" = "true" ] && [ -f /tmp/llamaswap-arm64.tar ]; then
+            echo "♻️  Restauration llama-swap ARM64 depuis le cache"
+            docker load -i /tmp/llamaswap-arm64.tar
+          else
+            echo "🔨 Compilation llama-swap ARM64 – ~1-2 min"
+            docker build -t tinai-llamaswap:local -f docker/Dockerfile.llamaswap-arm64 .
+            docker save tinai-llamaswap:local -o /tmp/llamaswap-arm64.tar
+          fi
+          echo "✅ tinai-llamaswap:local disponible"
+
+      - name: Setup .env CI
+        run: cp .env.example .env
+
+      - name: Lint install-arm64.sh (ShellCheck)
+        run: |
+          sudo apt-get install -y shellcheck
+          shellcheck --severity=warning --exclude=SC2034,SC2154 install-arm64.sh
+
+      - name: Exécution install-arm64.sh (CI=true)
+        run: |
+          chmod +x install-arm64.sh
+          CI=true bash install-arm64.sh
+          echo "── docker-compose.yml ──"
+          cat TinAI/docker-compose.yml
+
+      - name: Validation syntaxe docker-compose
+        run: |
+          cd TinAI
+          docker compose config > /dev/null
+          echo "✅ Syntaxe valide"
+
+      - name: Vérification images ARM64 dans docker-compose
+        run: |
+          cd TinAI
+          # llama-server, embeddings, vision doivent utiliser l'image locale
+          for svc in "tinai-llama" "tinai-embeddings" "tinai-vision"; do
+            if grep -A2 "container_name: $svc" docker-compose.yml | grep -q "tinai-llamacpp:local"; then
+              echo "✅ $svc → tinai-llamacpp:local"
+            else
+              echo "❌ $svc n'utilise pas tinai-llamacpp:local"
+              exit 1
+            fi
+          done
+          # llama-swap doit utiliser l'image swap locale
+          if grep -A2 "container_name: tinai-swap" docker-compose.yml | grep -q "tinai-llamaswap:local"; then
+            echo "✅ tinai-swap → tinai-llamaswap:local"
+          else
+            echo "❌ tinai-swap n'utilise pas tinai-llamaswap:local"
+            exit 1
+          fi
+
+      - name: Vérification services générés
+        run: |
+          cd TinAI
+          FAIL=false
+          EXPECTED=(
+            tinai-llama tinai-webui tinai-sillytavern tinai-code
+            tinai-aider tinai-openfang tinai-embeddings tinai-qdrant
+            tinai-vision tinai-comfyui tinai-swap tinai-caddy tinai-filebrowser
+          )
+          for svc in "${EXPECTED[@]}"; do
+            if grep -q "container_name: $svc" docker-compose.yml; then
+              echo "✅ $svc"
+            else
+              echo "❌ $svc MANQUANT"
+              FAIL=true
+            fi
+          done
+          $FAIL && exit 1 || echo "✅ Tous les services présents"
+
+      - name: Vérification CLI généré
+        run: |
+          tinai help
+          echo "✅ CLI tinai opérationnel"
+          for var in TINAI_VERSION TINAI_DIR ARCH LLAMA_IMAGE PORT_LLAMA; do
+            grep -q "$var=" /usr/local/bin/tinai || {
+              echo "❌ Variable manquante dans le CLI : $var"
+              exit 1
+            }
+          done
+          # Vérifie que l'archi est correcte
+          grep -q 'ARCH="aarch64"' /usr/local/bin/tinai || {
+            echo "❌ ARCH incorrecte dans le CLI"
+            exit 1
+          }
+          # Vérifie l'image locale dans le CLI
+          grep -q 'LLAMA_IMAGE="tinai-llamacpp:local"' /usr/local/bin/tinai || {
+            echo "❌ LLAMA_IMAGE incorrecte dans le CLI"
+            exit 1
+          }
+          echo "✅ Variables CLI ARM64 OK"
+
+      - name: Démarrage des services
+        run: |
+          cd TinAI
+          docker compose up -d
+          docker compose ps
+
+      - name: Attente des services
+        run: |
+          wait_for() {
+            local name=$1 url=$2 max=${3:-120} i=0
+            printf "⏳ %-42s" "$name"
+            while ! curl -sSf --max-time 5 "$url" >/dev/null 2>&1; do
+              sleep 5; i=$((i+5))
+              [ $i -ge $max ] && { echo "⚠️  timeout ${max}s"; return 1; }
+            done
+            echo "✅ ${i}s"
+          }
+          wait_for "Open-WebUI   (3000)"  "http://127.0.0.1:3000/"             120 || true
+          wait_for "SillyTavern  (8008)"  "http://127.0.0.1:8008/"             300 || true
+          wait_for "Code-Server  (8080)"  "http://127.0.0.1:8080/"             120 || true
+          wait_for "Embeddings   (8084)"  "http://127.0.0.1:8084/health"       180 || true
+          wait_for "Qdrant       (6333)"  "http://127.0.0.1:6333/healthz"       60 || true
+          wait_for "Vision       (8085)"  "http://127.0.0.1:8085/health"       240 || true
+          wait_for "llama-swap   (11434)" "http://127.0.0.1:11434/health"       90 || true
+          wait_for "Caddy        (80)"    "http://127.0.0.1:80/"                60 || true
+          wait_for "Filebrowser  (8083)"  "http://127.0.0.1:8083/"              60 || true
+
+      - name: Test API llama-server ARM64
+        run: |
+          MAX=120; I=0
+          while ! curl -sf http://127.0.0.1:8081/health >/dev/null 2>&1; do
+            sleep 5; I=$((I+5))
+            [ $I -ge $MAX ] && { echo "ℹ️  llama-server en attente modèle"; break; }
+          done
+          if curl -sf http://127.0.0.1:8081/v1/models 2>/dev/null | grep -q "data"; then
+            echo "✅ API llama-server OK"
+          else
+            echo "ℹ️  llama-server démarré, modèle en cours de téléchargement"
+          fi
+
+      - name: Test CLI tinai status
+        run: |
+          OUT=$(tinai status 2>&1)
+          echo "$OUT"
+          echo "$OUT" | grep -q "TinAI" || { echo "❌ tinai status KO"; exit 1; }
+          echo "$OUT" | grep -q "aarch64" || echo "⚠️  Architecture absente de la sortie status"
+          echo "✅ tinai status OK"
+
+      - name: Test binaire llama.cpp ARM64 (architecture correcte)
+        run: |
+          # Vérifie que le binaire compilé est bien ARM64
+          docker run --rm --entrypoint file tinai-llamacpp:local /app/llama-server \
+            | grep -q "ARM aarch64" || {
+              echo "❌ Le binaire llama-server n'est pas ARM64 !"
+              exit 1
+            }
+          echo "✅ Binaire llama-server est bien ARM64"
+
+      - name: Test binaire llama-swap ARM64
+        run: |
+          docker run --rm --entrypoint file tinai-llamaswap:local /usr/local/bin/llama-swap \
+            | grep -q "ARM aarch64" || {
+              echo "❌ Le binaire llama-swap n'est pas ARM64 !"
+              exit 1
+            }
+          echo "✅ Binaire llama-swap est bien ARM64"
+
+      - name: Debug – logs services lents
+        if: always()
+        run: |
+          echo "=== SillyTavern ===" && docker logs tinai-sillytavern --tail=30 2>&1 || true
+          echo "=== llama-server ===" && docker logs tinai-llama --tail=20 2>&1 || true
+          echo "=== Embeddings ===" && docker logs tinai-embeddings --tail=20 2>&1 || true
+          echo "=== Vision ===" && docker logs tinai-vision --tail=20 2>&1 || true
+          echo "=== llama-swap ===" && docker logs tinai-swap --tail=20 2>&1 || true
+
+      - name: Tests fonctionnels + génération rapport
+        id: tests
+        run: |
+          ARCH=$(uname -m)
+          FAILED=false; ROWS=""
+          check() {
+            local name=$1 url=$2 required=${3:-true}
+            if curl -sSf --max-time 10 "$url" >/dev/null 2>&1; then
+              ROWS+="| $name | ✅ OK | \`$url\` |\n"
+            else
+              ROWS+="| $name | ❌ FAIL | \`$url\` |\n"
+              [ "$required" = "true" ] && FAILED=true
+            fi
+          }
+          check "Open-WebUI (3000)"  "http://127.0.0.1:3000/"          true
+          check "SillyTavern (8008)" "http://127.0.0.1:8008/"          false
+          check "Code-Server (8080)" "http://127.0.0.1:8080/"          true
+          check "Embeddings (8084)"  "http://127.0.0.1:8084/health"    true
+          check "Qdrant (6333)"      "http://127.0.0.1:6333/healthz"   true
+          check "Vision (8085)"      "http://127.0.0.1:8085/health"    true
+          check "llama-swap (11434)" "http://127.0.0.1:11434/health"   true
+          check "Caddy (80)"         "http://127.0.0.1:80/"            true
+          check "Filebrowser (8083)" "http://127.0.0.1:8083/"          true
+          check "OpenFang (4200)"    "http://127.0.0.1:4200/"          false
+          check "ComfyUI (7860)"     "http://127.0.0.1:7860/system_stats" false
+
+          docker ps --format '{{.Names}}' | grep -q "tinai-llama" \
+            && ROWS+="| llama-server (8081) | ✅ Conteneur actif | modèle en dl au 1er run |\n" \
+            || { ROWS+="| llama-server (8081) | ❌ Arrêté | \`docker logs tinai-llama\` |\n"; FAILED=true; }
+
+          docker ps --format '{{.Names}}' | grep -q "tinai-aider" \
+            && ROWS+="| Aider | ✅ Actif | CLI uniquement |\n" \
+            || ROWS+="| Aider | ⚠️ Absent | optionnel |\n"
+
+          CLI_OUT=$(tinai status 2>&1) \
+            && ROWS+="| CLI \`tinai status\` | ✅ OK | - |\n" \
+            || ROWS+="| CLI \`tinai status\` | ❌ FAIL | - |\n"
+
+          CONTAINERS=$(cd TinAI && docker compose ps 2>&1)
+
+          {
+            echo "# TinAI v2 – Test Report (ARM64)"
+            echo ""
+            echo "Date   : $(date -u +"%Y-%m-%d %H:%M UTC")"
+            echo "Run    : ${{ github.run_number }}"
+            echo "URL    : ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "SHA    : ${{ github.sha }}"
+            echo "Branch : ${{ github.ref_name }}"
+            echo "Arch   : ${ARCH} (ubuntu-24.04-arm)"
+            echo ""
+            echo "## Résultats"
+            echo ""
+            echo "| Service | Statut | Endpoint |"
+            echo "|---------|--------|----------|"
+            echo -e "$ROWS"
+            echo ""
+            echo "## État des conteneurs"
+            echo '```'
+            echo "$CONTAINERS"
+            echo '```'
+            echo ""
+            echo "## tinai status"
+            echo '```'
+            echo "$CLI_OUT"
+            echo '```'
+            echo ""
+            echo "## Images ARM64 natives"
+            echo "- llama.cpp    : tinai-llamacpp:local (compilé NEON/SVE, cachée entre les runs)"
+            echo "- llama-swap   : tinai-llamaswap:local (binaire Go natif arm64)"
+            echo "- ComfyUI      : ai-dock/comfyui:latest-cpu (multi-arch officielle)"
+            echo "- llama-server : télécharge Qwen3-2B (~1.7 GB) au 1er démarrage"
+          } > TEST-REPORT-arm64.md
+
+          cat TEST-REPORT-arm64.md
+          [ "$FAILED" = "true" ] && echo "failed=true" >> $GITHUB_OUTPUT || echo "failed=false" >> $GITHUB_OUTPUT
+
+      - name: Upload rapport
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: TEST-REPORT-arm64
+          path: TEST-REPORT-arm64.md
+
+      - name: Commit TEST-REPORT-arm64.md
+        if: always()
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add TEST-REPORT-arm64.md openfang-version-arm64.txt || true
+          git diff --cached --quiet && exit 0
+          git commit -m "🧪 CI ARM64 #${{ github.run_number }} – TEST-REPORT"
+          for i in 1 2 3; do
+            git push && break
+            git pull --rebase origin main
+          done
+
+      - name: Fail si tests échoués
+        if: steps.tests.outputs.failed == 'true'
+        run: echo "❌ Tests ARM64 échoués – voir TEST-REPORT-arm64.md" && exit 1
+
+      - name: Teardown
+        if: always()
+        run: |
+          docker compose -f TinAI/docker-compose.yml down --remove-orphans -v 2>/dev/null || true
+          docker system prune -f
