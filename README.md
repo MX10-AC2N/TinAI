@@ -1,7 +1,8 @@
 # TinAI v3 🧠
 
-[![CI – TinAI v3](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml/badge.svg)](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml)
-[![Test Report](https://img.shields.io/badge/test--report-latest-blue)](./TEST-REPORT.md)
+[![CI – amd64](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml)
+[![Test Report amd64](https://img.shields.io/badge/test--report-amd64-blue)](./TEST-REPORT.md)
+[![Test Report arm64](https://img.shields.io/badge/test--report-arm64-blueviolet)](./TEST-REPORT.md)
 [![Version](https://img.shields.io/badge/version-3.0.0-green)](https://github.com/MX10-AC2N/TinAI/releases)
 [![License](https://img.shields.io/badge/license-MIT-orange)](./LICENSE)
 
@@ -136,12 +137,15 @@ curl http://localhost:8081/v1/chat/completions \
 
 Le workflow CI s'exécute à chaque push sur `main` et génère automatiquement [`TEST-REPORT.md`](./TEST-REPORT.md).
 
-**Étapes du pipeline :**
+**Pipeline en 3 jobs :**
 
 1. **🔒 Audit sécurité** — ShellCheck, secrets hardcodés, `.env` absent du repo, ports via variables
-2. **🧪 Build & Test** — Build Docker multi-stage, démarrage du conteneur, tests de disponibilité des 3 services, rapport committé automatiquement
+2. **🧪 Build & Test (matrice)** — Build Docker natif sur `ubuntu-latest` (amd64) et `ubuntu-24.04-arm` (arm64) en parallèle. Démarrage du conteneur, tests de disponibilité des 3 services, upload d'un artifact `TEST-REPORT-{arch}.md` par architecture
+3. **📋 Rapport consolidé** — Fusionne les deux rapports en `TEST-REPORT.md` et le committe sur `main`
 
 Le modèle GGUF n'est **pas** téléchargé en CI (trop lourd). Le rapport note `⏳ Modèle absent en CI` pour llama-server, ce qui est attendu.
+
+Les rapports détaillés par architecture sont disponibles en **artifacts** de chaque run GitHub Actions.
 
 ---
 
