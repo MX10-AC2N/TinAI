@@ -1,0 +1,17 @@
+# ══════════════════════════════════════════════════════════════════
+#  TinAI v3 – OpenFang configuration
+#  Ce fichier est généré automatiquement au premier démarrage.
+#  Pour personnaliser : monte /data/openfang/openfang.toml
+# ══════════════════════════════════════════════════════════════════
+
+[server]
+host = "0.0.0.0"
+port = 4200
+
+[llm]
+base_url = "http://localhost:8081/v1"
+api_key  = "sk-tinai"
+model    = "qwen3-1.7b"
+
+[agents]
+dir = "/data/openfang/agents"
