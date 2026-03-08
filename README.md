@@ -1,5 +1,10 @@
 # TinAI v3 🧠
 
+[![CI – TinAI v3](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml/badge.svg)](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml)
+[![Test Report](https://img.shields.io/badge/test--report-latest-blue)](./TEST-REPORT.md)
+[![Version](https://img.shields.io/badge/version-3.0.0-green)](https://github.com/MX10-AC2N/TinAI/releases)
+[![License](https://img.shields.io/badge/license-MIT-orange)](./LICENSE)
+
 **Un seul conteneur Docker.** llama.cpp + Open WebUI + OpenFang + Qwen3-1.7B.  
 100 % offline, CPU-only, ~3–4 GB RAM.
 
@@ -124,6 +129,19 @@ curl http://localhost:8081/v1/chat/completions \
   /data/webui     – base de données WebUI
   /data/openfang  – agents & config
 ```
+
+---
+
+## CI / Test Report
+
+Le workflow CI s'exécute à chaque push sur `main` et génère automatiquement [`TEST-REPORT.md`](./TEST-REPORT.md).
+
+**Étapes du pipeline :**
+
+1. **🔒 Audit sécurité** — ShellCheck, secrets hardcodés, `.env` absent du repo, ports via variables
+2. **🧪 Build & Test** — Build Docker multi-stage, démarrage du conteneur, tests de disponibilité des 3 services, rapport committé automatiquement
+
+Le modèle GGUF n'est **pas** téléchargé en CI (trop lourd). Le rapport note `⏳ Modèle absent en CI` pour llama-server, ce qui est attendu.
 
 ---
 
