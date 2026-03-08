@@ -1,0 +1,62 @@
+# ══════════════════════════════════════════════════════════════════
+#  TinAI v3 – docker-compose.yml
+#  Un seul conteneur : llama.cpp + Open WebUI + OpenFang
+#  Modèle : Qwen3-1.7B (téléchargé automatiquement)
+# ══════════════════════════════════════════════════════════════════
+
+services:
+  tinai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tinai:v3
+
+    container_name: tinai
+
+    restart: unless-stopped
+
+    ports:
+      - "${PORT_WEBUI:-3000}:3000"       # Open WebUI  → http://localhost:3000
+      - "${PORT_OPENFANG:-4200}:4200"    # OpenFang    → http://localhost:4200
+      - "${PORT_LLAMA:-8081}:8081"       # llama-server API (OpenAI-compatible)
+
+    volumes:
+      - ${MODELS_DIR:-./models}:/data/models          # Modèles GGUF
+      - ${WEBUI_DATA_DIR:-./data/webui}:/data/webui   # Base de données WebUI
+      - ${OPENFANG_DATA_DIR:-./data/openfang}:/data/openfang  # Agents & config
+
+    environment:
+      # ── Modèle ──────────────────────────────────────────────────
+      LLAMA_HF_REPO:    ${LLAMA_HF_REPO:-Qwen/Qwen3-1.7B-GGUF}
+      LLAMA_HF_FILE:    ${LLAMA_HF_FILE:-qwen3-1.7b-q5_k_m.gguf}
+      LLAMA_MODEL_PATH: /data/models/${LLAMA_HF_FILE:-qwen3-1.7b-q5_k_m.gguf}
+
+      # ── Paramètres llama.cpp ─────────────────────────────────────
+      LLAMA_CTX_SIZE:   ${LLAMA_CTX_SIZE:-8192}
+      LLAMA_THREADS:    ${LLAMA_THREADS:-4}
+      LLAMA_GPU_LAYERS: ${LLAMA_GPU_LAYERS:-0}
+      LLAMA_PORT:       8081
+
+      # ── Ports internes ───────────────────────────────────────────
+      WEBUI_PORT:       3000
+      OPENFANG_PORT:    4200
+
+      # ── Auth & secrets ───────────────────────────────────────────
+      TINAI_API_KEY:       ${TINAI_API_KEY:-sk-tinai}
+      WEBUI_SECRET_KEY:    ${WEBUI_SECRET_KEY:-tinai-secret-change-me}
+
+    mem_limit: ${MEM_LIMIT:-6g}
+    mem_reservation: 2g
+
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
