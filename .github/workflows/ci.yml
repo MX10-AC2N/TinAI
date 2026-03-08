@@ -1,92 +1,89 @@
-name: CI – TinAI v3
+name: CI - TinAI v3
 
-on:
+"on":
   push:
     branches: [main]
     paths:
-      - 'Dockerfile'
-      - 'docker-compose.yml'
-      - '.env.example'
-      - 'supervisord.conf'
-      - 'scripts/**'
-      - '.github/workflows/ci.yml'
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - ".env.example"
+      - "supervisord.conf"
+      - "scripts/**"
+      - ".github/workflows/ci.yml"
   pull_request:
     branches: [main]
   workflow_dispatch:
 
-# ══════════════════════════════════════════════════════════════════
-#  JOB 1 – Audit sécurité (rapide, sans Docker)
-# ══════════════════════════════════════════════════════════════════
 jobs:
+
+  # ================================================================
+  # JOB 1 - Audit securite
+  # ================================================================
   security-audit:
-    name: 🔒 Audit sécurité
+    name: Audit securite
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: ShellCheck – scripts/
+      - name: ShellCheck
         run: |
           sudo apt-get install -y shellcheck -q
-          shellcheck --severity=error \
-            --exclude=SC2034,SC2154,SC1091 \
+          shellcheck --severity=error --exclude=SC2034,SC2154,SC1091 \
             scripts/start-llama.sh \
             scripts/start-webui.sh \
             scripts/start-openfang.sh \
             scripts/healthcheck.sh
-          echo "✅ ShellCheck OK"
+          echo "ShellCheck OK"
 
-      - name: Audit secrets hardcodés
+      - name: Audit secrets hardcodes
         run: |
           FAIL=false
-          # Patterns suspects : on exclut explicitement les fichiers
-          # qui génèrent de la config (start-openfang.sh) via printf/echo
           FILES="Dockerfile docker-compose.yml .env.example supervisord.conf"
           for p in 'AWS_SECRET' 'GITHUB_TOKEN\s*='; do
             if grep -riE "$p" $FILES 2>/dev/null; then
-              echo "❌ Pattern suspect : $p"
+              echo "FAIL - pattern suspect : $p"
               FAIL=true
             fi
           done
-          # Pour les patterns api_key / password, on scanne SAUF les scripts
-          # qui écrivent légitimement des configs (ils utilisent des variables)
           for p in 'password\s*=\s*"[^$]' 'SECRET_KEY\s*=\s*"[^$]'; do
             if grep -riE "$p" $FILES 2>/dev/null; then
-              echo "❌ Valeur hardcodée suspecte : $p"
+              echo "FAIL - valeur hardcodee : $p"
               FAIL=true
             fi
           done
-          $FAIL && exit 1 || echo "✅ Aucun secret hardcodé"
+          if [ "$FAIL" = "true" ]; then exit 1; fi
+          echo "Aucun secret hardcode"
 
-      - name: .env absent du repo
+      - name: Verif .env absent du repo
         run: |
           if git ls-files --error-unmatch .env 2>/dev/null; then
-            echo "❌ DANGER : .env est tracké par git !"
+            echo "DANGER - .env est tracke par git"
             exit 1
           fi
-          echo "✅ .env absent du repo"
+          echo ".env absent OK"
 
-      - name: .gitignore vérifié
+      - name: Verif .gitignore
         run: |
           for pattern in ".env" "models/" "data/"; do
-            grep -qF "$pattern" .gitignore \
-              || echo "⚠️  Manquant dans .gitignore : $pattern"
+            grep -qF "$pattern" .gitignore || echo "Manquant dans .gitignore : $pattern"
           done
-          echo "✅ .gitignore OK"
+          echo ".gitignore OK"
 
-      - name: Ports via variables dans docker-compose
+      - name: Verif ports via variables
         run: |
           if grep -E '^\s+-\s+"[0-9]+:[0-9]+"' docker-compose.yml; then
-            echo "❌ Port hardcodé – utilise \${PORT_xxx}"
+            echo "FAIL - port hardcode detecte"
             exit 1
           fi
-          echo "✅ Ports via variables OK"
+          echo "Ports via variables OK"
 
-# ══════════════════════════════════════════════════════════════════
-#  JOB 2 – Build & Test (matrice amd64 / arm64)
-# ══════════════════════════════════════════════════════════════════
+  # ================================================================
+  # JOB 2 - Build et test (matrice amd64 / arm64)
+  # ================================================================
   build-test:
-    name: 🧪 Build & Test – ${{ matrix.arch }}
+    name: Build et Test - ${{ matrix.arch }}
     runs-on: ${{ matrix.runner }}
     needs: security-audit
     timeout-minutes: 90
@@ -105,208 +102,158 @@ jobs:
             platform: linux/arm64
 
     steps:
-      - uses: actions/checkout@v4
-
-      # ── Cache Buildx ──────────────────────────────────────────────
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache-${{ matrix.arch }}
-          key: buildx-${{ matrix.arch }}-${{ hashFiles('Dockerfile', 'scripts/**', 'supervisord.conf') }}
-          restore-keys: buildx-${{ matrix.arch }}-
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # ── .env CI ───────────────────────────────────────────────────
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/buildx-cache
+          key: buildx-${{ matrix.arch }}-${{ hashFiles('Dockerfile', 'supervisord.conf') }}
+          restore-keys: |
+            buildx-${{ matrix.arch }}-
+
       - name: Setup .env CI
         run: |
           cp .env.example .env
-          # Modèle léger + peu de threads pour la CI
-          cat >> .env <<ENVEOF
-          LLAMA_HF_FILE=qwen3-1.7b-q4_k_m.gguf
-          LLAMA_THREADS=2
-          LLAMA_CTX_SIZE=2048
-          MEM_LIMIT=5g
-          ENVEOF
+          echo "LLAMA_HF_FILE=qwen3-1.7b-q4_k_m.gguf" >> .env
+          echo "LLAMA_THREADS=2" >> .env
+          echo "LLAMA_CTX_SIZE=2048" >> .env
+          echo "MEM_LIMIT=5g" >> .env
+          echo "TINAI_IMAGE=tinai:v3-${{ matrix.arch }}" >> .env
 
-      # ── Lint ──────────────────────────────────────────────────────
       - name: Lint docker-compose
         run: |
           docker compose config > /dev/null
-          echo "✅ Syntaxe docker-compose valide"
+          echo "Syntaxe docker-compose valide"
 
-      # ── Build ─────────────────────────────────────────────────────
       - name: Build image tinai:v3-${{ matrix.arch }}
         run: |
           docker buildx build \
-            --platform ${{ matrix.platform }} \
-            --cache-from=type=local,src=/tmp/.buildx-cache-${{ matrix.arch }} \
-            --cache-to=type=local,dest=/tmp/.buildx-cache-${{ matrix.arch }}-new,mode=max \
+            --platform "${{ matrix.platform }}" \
+            --cache-from "type=local,src=/tmp/buildx-cache" \
+            --cache-to   "type=local,dest=/tmp/buildx-cache-new,mode=max" \
             --load \
-            -t tinai:v3-${{ matrix.arch }} \
+            -t "tinai:v3-${{ matrix.arch }}" \
             .
-          # Rotation du cache
-          rm -rf /tmp/.buildx-cache-${{ matrix.arch }}
-          mv /tmp/.buildx-cache-${{ matrix.arch }}-new /tmp/.buildx-cache-${{ matrix.arch }}
-          echo "✅ Build ${{ matrix.arch }} OK"
+          rm -rf /tmp/buildx-cache
+          mv /tmp/buildx-cache-new /tmp/buildx-cache
+          echo "Build ${{ matrix.arch }} OK"
 
-      - name: Taille de l'image
-        run: docker images tinai:v3-${{ matrix.arch }} --format "Taille ${{ matrix.arch }} : {{.Size}}"
+      - name: Taille de l image
+        run: |
+          docker images "tinai:v3-${{ matrix.arch }}" --format "Taille : {{.Size}}"
 
-      # ── Démarrage ─────────────────────────────────────────────────
-      - name: Création des volumes locaux
+      - name: Preparation volumes
         run: mkdir -p models data/webui data/openfang
 
-      - name: Démarrage du conteneur (${{ matrix.arch }})
+      - name: Demarrage du conteneur
         run: |
-          # Override image dans docker-compose pour pointer sur le bon tag arch
-          TINAI_IMAGE=tinai:v3-${{ matrix.arch }} \
-            docker compose up -d
+          docker compose up -d
           docker compose ps
 
-      # ── Attente services ──────────────────────────────────────────
-      - name: Attente Open WebUI + OpenFang
+      - name: Attente des services
         run: |
           wait_for() {
-            local name=$1 url=$2 max=${3:-90} i=0
-            printf "⏳ %-40s" "$name"
-            while ! curl -sSf --max-time 5 "$url" >/dev/null 2>&1; do
-              sleep 5; i=$((i+5))
-              [ $i -ge $max ] && { echo "⚠️  timeout ${max}s"; return 1; }
+            local name="$1" url="$2" max="${3:-90}" i=0
+            echo "Attente $name ..."
+            while ! curl -sSf --max-time 5 "$url" > /dev/null 2>&1; do
+              sleep 5
+              i=$((i + 5))
+              if [ "$i" -ge "$max" ]; then
+                echo "Timeout ${max}s pour $name"
+                return 1
+              fi
             done
-            echo "✅ ${i}s"
+            echo "OK $name en ${i}s"
           }
-          wait_for "Open WebUI   (:3000)" "http://127.0.0.1:3000/"       90 || true
-          wait_for "OpenFang     (:4200)" "http://127.0.0.1:4200/"      120 || true
-          wait_for "llama-server (:8081)" "http://127.0.0.1:8081/health" 30 || true
+          wait_for "Open WebUI 3000"   "http://127.0.0.1:3000/"        90 || true
+          wait_for "OpenFang 4200"     "http://127.0.0.1:4200/"       120 || true
+          wait_for "llama-server 8081" "http://127.0.0.1:8081/health"  30 || true
 
-      # ── Tests fonctionnels ────────────────────────────────────────
       - name: Tests fonctionnels
         id: tests
         run: |
           FAILED=false
-          ROWS=""
-          API_KEY="${TINAI_API_KEY:-sk-tinai}"
           ARCH="${{ matrix.arch }}"
+          API_KEY="sk-tinai"
 
-          check() {
-            local name=$1 url=$2 auth=${3:-""} required=${4:-true}
-            local args=()
-            [ -n "$auth" ] && args+=(-H "Authorization: Bearer $auth")
-            if curl -sSf --max-time 10 "${args[@]}" "$url" >/dev/null 2>&1; then
-              ROWS+="| $name | ✅ OK | \`$url\` |\n"
+          check_url() {
+            local name="$1" url="$2" required="$3"
+            if curl -sSf --max-time 10 "$url" > /dev/null 2>&1; then
+              echo "OK  | $name"
             else
-              ROWS+="| $name | ❌ FAIL | \`$url\` |\n"
-              [ "$required" = "true" ] && FAILED=true
+              echo "KO  | $name"
+              if [ "$required" = "true" ]; then FAILED=true; fi
             fi
           }
 
-          check "Open WebUI (3000)"    "http://127.0.0.1:3000/"                ""         true
-          check "OpenFang (4200)"      "http://127.0.0.1:4200/"                ""         false
-
-          # llama-server : port ouvert suffit (pas de modèle en CI)
-          if curl -sSf --max-time 5 \
-              -H "Authorization: Bearer ${API_KEY}" \
-              "http://127.0.0.1:8081/health" >/dev/null 2>&1; then
-            ROWS+="| llama-server (8081) | ✅ API répond | \`/health\` |\n"
-          else
-            ROWS+="| llama-server (8081) | ⏳ En démarrage | modèle absent en CI |\n"
-          fi
+          check_url "Open WebUI 3000" "http://127.0.0.1:3000/" "true"
+          check_url "OpenFang 4200"   "http://127.0.0.1:4200/" "false"
 
           if curl -sSf --max-time 5 \
               -H "Authorization: Bearer ${API_KEY}" \
-              "http://127.0.0.1:8081/v1/models" 2>/dev/null | grep -q '"data"'; then
-            ROWS+="| API /v1/models | ✅ OpenAI-compatible | JSON valide |\n"
+              "http://127.0.0.1:8081/health" > /dev/null 2>&1; then
+            echo "OK  | llama-server API repond"
           else
-            ROWS+="| API /v1/models | ⏳ Modèle non chargé | normal sans GGUF |\n"
+            echo "KO  | llama-server - modele absent en CI (attendu)"
           fi
 
-          # supervisord
-          SUPERVISOR_STATUS=$(docker compose exec -T tinai \
-            supervisorctl status 2>&1 || echo "N/A")
-          CONTAINER_STATUS=$(docker compose ps 2>&1)
-          IMAGE_SIZE=$(docker images tinai:v3-${{ matrix.arch }} --format "{{.Size}}")
+          SUPERVISOR=$(docker compose exec -T tinai supervisorctl status 2>&1 || echo "N/A")
+          CONTAINERS=$(docker compose ps 2>&1)
+          IMG_SIZE=$(docker images "tinai:v3-${{ matrix.arch }}" --format "{{.Size}}")
           BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
+          LOG_LLAMA=$(docker compose exec -T tinai tail -n 20 /var/log/tinai/llama.log 2>/dev/null || echo "N/A")
+          LOG_WEBUI=$(docker compose exec -T tinai tail -n 10 /var/log/tinai/webui.log 2>/dev/null || echo "N/A")
+          LOG_FANG=$(docker compose exec -T tinai tail -n 10 /var/log/tinai/openfang.log 2>/dev/null || echo "N/A")
 
-          # Logs résumés
-          LLAMA_LOG=$(docker compose exec -T tinai \
-            tail -n 20 /var/log/tinai/llama.log 2>/dev/null || echo "N/A")
-          WEBUI_LOG=$(docker compose exec -T tinai \
-            tail -n 10 /var/log/tinai/webui.log 2>/dev/null || echo "N/A")
-          OPENFANG_LOG=$(docker compose exec -T tinai \
-            tail -n 10 /var/log/tinai/openfang.log 2>/dev/null || echo "N/A")
-
-          # Génération rapport par arch
           REPORT="TEST-REPORT-${ARCH}.md"
-          {
-            echo "# TinAI v3 – Test Report (${ARCH})"
-            echo ""
-            echo "**Date     :** ${BUILD_DATE}"
-            echo "**Run      :** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-            echo "**Commit   :** \`${{ github.sha }}\`"
-            echo "**Branch   :** \`${{ github.ref_name }}\`"
-            echo "**Arch     :** \`${ARCH}\` (\`${{ matrix.platform }}\`)"
-            echo "**Image    :** \`tinai:v3-${ARCH}\` – ${IMAGE_SIZE}"
-            echo ""
-            echo "---"
-            echo ""
-            echo "## Résultats des tests"
-            echo ""
-            echo "| Service | Statut | Endpoint |"
-            echo "|---------|--------|----------|"
-            echo -e "$ROWS"
-            echo ""
-            echo "## État du conteneur"
-            echo ""
-            echo '```'
-            echo "$CONTAINER_STATUS"
-            echo '```'
-            echo ""
-            echo "## Services internes (supervisord)"
-            echo ""
-            echo '```'
-            echo "$SUPERVISOR_STATUS"
-            echo '```'
-            echo ""
-            echo "## Logs – llama-server"
-            echo '```'
-            echo "$LLAMA_LOG"
-            echo '```'
-            echo ""
-            echo "## Logs – Open WebUI"
-            echo '```'
-            echo "$WEBUI_LOG"
-            echo '```'
-            echo ""
-            echo "## Logs – OpenFang"
-            echo '```'
-            echo "$OPENFANG_LOG"
-            echo '```'
-            echo ""
-            echo "---"
-            echo ""
-            echo "## Notes"
-            echo "- **llama-server** : modèle Qwen3-1.7B non téléchargé en CI (pas de GGUF)"
-            echo "- **Open WebUI** : démarre sans modèle, interface disponible"
-            echo "- **OpenFang** : config auto-générée dans \`/data/openfang/openfang.toml\`"
-            echo "- **supervisord** orchestre les 3 processus dans le même conteneur"
-          } > "${REPORT}"
 
-          cat "${REPORT}"
-          [ "$FAILED" = "true" ] \
-            && echo "failed=true"  >> "$GITHUB_OUTPUT" \
-            || echo "failed=false" >> "$GITHUB_OUTPUT"
-          echo "report=${REPORT}" >> "$GITHUB_OUTPUT"
+          printf '# TinAI v3 - Test Report (%s)\n\n' "$ARCH"            > "$REPORT"
+          printf '**Date   :** %s\n' "$BUILD_DATE"                      >> "$REPORT"
+          printf '**Run    :** [#%s](%s/%s/actions/runs/%s)\n' \
+            "${{ github.run_number }}" \
+            "${{ github.server_url }}" \
+            "${{ github.repository }}" \
+            "${{ github.run_id }}"                                       >> "$REPORT"
+          printf '**Commit :** `%s`\n' "${{ github.sha }}"              >> "$REPORT"
+          printf '**Branch :** `%s`\n' "${{ github.ref_name }}"         >> "$REPORT"
+          printf '**Arch   :** `%s` (`%s`)\n' \
+            "$ARCH" "${{ matrix.platform }}"                            >> "$REPORT"
+          printf '**Image  :** `tinai:v3-%s` - %s\n\n' \
+            "$ARCH" "$IMG_SIZE"                                         >> "$REPORT"
+          printf '---\n\n## Etat du conteneur\n\n```\n%s\n```\n\n' \
+            "$CONTAINERS"                                               >> "$REPORT"
+          printf '## Services supervisord\n\n```\n%s\n```\n\n' \
+            "$SUPERVISOR"                                               >> "$REPORT"
+          printf '## Logs llama-server\n\n```\n%s\n```\n\n' \
+            "$LOG_LLAMA"                                                >> "$REPORT"
+          printf '## Logs Open WebUI\n\n```\n%s\n```\n\n' \
+            "$LOG_WEBUI"                                                >> "$REPORT"
+          printf '## Logs OpenFang\n\n```\n%s\n```\n\n' \
+            "$LOG_FANG"                                                 >> "$REPORT"
+          printf '---\n\n## Notes\n'                                    >> "$REPORT"
+          printf '- llama-server : modele non telecharge en CI\n'       >> "$REPORT"
+          printf '- Open WebUI : interface disponible sans modele\n'    >> "$REPORT"
+          printf '- OpenFang : config generee automatiquement\n'        >> "$REPORT"
 
-      # ── Debug si échec ────────────────────────────────────────────
-      - name: Debug – logs complets si échec
+          cat "$REPORT"
+
+          if [ "$FAILED" = "true" ]; then
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "failed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Debug logs si echec
         if: failure()
         run: |
           docker compose logs --tail=60 || true
           docker compose exec -T tinai supervisorctl status || true
 
-      # ── Upload artifact par arch ──────────────────────────────────
       - name: Upload TEST-REPORT-${{ matrix.arch }}
         uses: actions/upload-artifact@v4
         if: always()
@@ -320,78 +267,73 @@ jobs:
           docker compose down --remove-orphans -v 2>/dev/null || true
           docker system prune -f
 
-      - name: Fail si tests critiques échoués
+      - name: Echec si tests critiques ko
         if: steps.tests.outputs.failed == 'true'
-        run: echo "❌ Tests ${{ matrix.arch }} échoués" && exit 1
+        run: |
+          echo "Tests critiques echoues sur ${{ matrix.arch }}"
+          exit 1
 
-# ══════════════════════════════════════════════════════════════════
-#  JOB 3 – Consolidation des rapports + commit TEST-REPORT.md
-# ══════════════════════════════════════════════════════════════════
+  # ================================================================
+  # JOB 3 - Rapport consolide + commit TEST-REPORT.md
+  # ================================================================
   report:
-    name: 📋 Rapport consolidé
+    name: Rapport consolide
     runs-on: ubuntu-latest
     needs: build-test
-    if: always() && github.event_name != 'pull_request'
+    if: "always() && github.event_name != 'pull_request'"
     permissions:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Téléchargement des rapports par arch
+      - name: Download rapports
         uses: actions/download-artifact@v4
         with:
           pattern: TEST-REPORT-*
           merge-multiple: true
           path: reports/
 
-      - name: Génération TEST-REPORT.md consolidé
+      - name: Generation TEST-REPORT.md consolide
         run: |
           BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
-
           {
-            echo "# TinAI v3 – Test Report"
-            echo ""
-            echo "**Date   :** ${BUILD_DATE}"
-            echo "**Run    :** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-            echo "**Commit :** \`${{ github.sha }}\`"
-            echo "**Branch :** \`${{ github.ref_name }}\`"
-            echo ""
-            echo "---"
-            echo ""
-
+            printf '# TinAI v3 - Test Report\n\n'
+            printf '**Date   :** %s\n' "$BUILD_DATE"
+            printf '**Run    :** [#%s](%s/%s/actions/runs/%s)\n' \
+              "${{ github.run_number }}" \
+              "${{ github.server_url }}" \
+              "${{ github.repository }}" \
+              "${{ github.run_id }}"
+            printf '**Commit :** `%s`\n' "${{ github.sha }}"
+            printf '**Branch :** `%s`\n\n' "${{ github.ref_name }}"
+            printf '---\n\n'
             for arch in amd64 arm64; do
-              REPORT="reports/TEST-REPORT-${arch}.md"
-              if [ -f "$REPORT" ]; then
-                echo "## $arch"
-                echo ""
-                # Extrait uniquement le tableau des résultats
-                awk '/^## Résultats/,/^## État/' "$REPORT" \
-                  | grep -v "^## État" || true
-                echo ""
+              printf '## %s\n\n' "$arch"
+              if [ -f "reports/TEST-REPORT-${arch}.md" ]; then
+                awk '/^## Etat/,/^## Services/' "reports/TEST-REPORT-${arch}.md" \
+                  | grep -v "^## Services" || true
               else
-                echo "## ${arch}"
-                echo ""
-                echo "> ⚠️ Rapport non disponible (runner absent ou build échoué)"
-                echo ""
+                printf '> Rapport non disponible pour %s\n' "$arch"
               fi
+              printf '\n'
             done
-
-            echo "---"
-            echo ""
-            echo "*Rapports détaillés par architecture disponibles en artifacts du workflow.*"
+            printf '---\n\n'
+            printf '*Rapports detailles disponibles en artifacts du workflow.*\n'
           } > TEST-REPORT.md
-
           cat TEST-REPORT.md
 
       - name: Commit TEST-REPORT.md
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add TEST-REPORT.md || true
-          git diff --cached --quiet && exit 0
-          git commit -m "🧪 CI #${{ github.run_number }} – TEST-REPORT mis à jour (amd64 + arm64)"
+          git add TEST-REPORT.md
+          if git diff --cached --quiet; then
+            echo "Aucun changement"
+            exit 0
+          fi
+          git commit -m "ci: TEST-REPORT #${{ github.run_number }} (amd64 + arm64)"
           for i in 1 2 3; do
-            git push && break
-            git pull --rebase origin main
+            git push && break || git pull --rebase origin main
           done
