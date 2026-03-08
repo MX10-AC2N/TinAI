@@ -1,7 +1,7 @@
 # TinAI 🧠
 
-[![CI x86_64](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker%E2%80%91ci%E2%80%91test%E2%80%91report.yml/badge.svg)](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker%E2%80%91ci%E2%80%91test%E2%80%91report.yml)
-[![CI ARM64](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker-ci-test-report-arm64.yml/badge.svg)](https://github.com/MX10-AC2N/TinAI/actions/workflows/docker-ci-test-report-arm64.yml)
+[![CI – TinAI x86_64](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci-x86.yml/badge.svg)](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci-x86.yml)
+[![CI – TinAI ARM64](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci-arm64.yml/badge.svg)](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci-arm64.yml)
 [![TEST-REPORT x86](https://img.shields.io/badge/test--report-x86__64-blue)](./TEST-REPORT.md)
 [![TEST-REPORT ARM64](https://img.shields.io/badge/test--report-arm64-blueviolet)](./TEST-REPORT-arm64.md)
 [![Version](https://img.shields.io/badge/version-2.0.0-green)](https://github.com/MX10-AC2N/TinAI/releases)
