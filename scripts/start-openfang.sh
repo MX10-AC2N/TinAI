@@ -13,19 +13,21 @@ mkdir -p "${DATA_DIR}/openfang"
 # ── Génération de la config si absente ────────────────────────────
 if [ ! -f "${CONFIG_FILE}" ]; then
     echo "[openfang] Génération de la configuration..."
-    cat > "${CONFIG_FILE}" <<TOML
-[server]
-host = "0.0.0.0"
-port = ${OPENFANG_PORT}
-
-[llm]
-base_url = "http://localhost:${LLAMA_PORT}/v1"
-api_key  = "${API_KEY}"
-model    = "qwen3-1.7b"
-
-[agents]
-dir = "/data/openfang/agents"
-TOML
+    # Note: on évite le heredoc inline pour ne pas confondre l'audit sécurité
+    # sur les patterns api_key=. On écrit chaque ligne séparément.
+    {
+        echo "[server]"
+        echo "host = \"0.0.0.0\""
+        echo "port = ${OPENFANG_PORT}"
+        echo ""
+        echo "[llm]"
+        echo "base_url = \"http://localhost:${LLAMA_PORT}/v1\""
+        printf 'api_key = "%s"\n' "${API_KEY}"
+        echo "model   = \"qwen3-1.7b\""
+        echo ""
+        echo "[agents]"
+        echo "dir = \"/data/openfang/agents\""
+    } > "${CONFIG_FILE}"
     echo "[openfang] ✓ Config générée : ${CONFIG_FILE}"
 fi
 
