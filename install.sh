@@ -106,7 +106,7 @@ Caddy"
 else
     if ! command -v gum &>/dev/null; then
         echo "📦 Installation de gum..."
-        GUM_URL="https://github.com/charmbracelet/gum/releases/latest/download/gum_Linux_x86_64.tar.gz"
+        GUM_URL="https://github.com/charmbracelet/gum/releases/download/v0.17.0/gum_0.17.0_Linux_x86_64.tar.gz"
         curl -fsSL "$GUM_URL" | tar -xz -C /tmp/
         sudo mv "$(find /tmp -name 'gum' -type f | head -1)" /usr/local/bin/gum
         echo "✅ gum installé"
