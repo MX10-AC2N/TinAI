@@ -9,7 +9,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: tinai:v3
+    image: ${TINAI_IMAGE:-tinai:v3}
 
     container_name: tinai
 
