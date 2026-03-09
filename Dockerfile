@@ -48,7 +48,7 @@ FROM debian:bookworm-slim AS openfang-builder
 ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl git gcc musl-tools ca-certificates \
+    curl git build-essential ca-certificates \
     libssl-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
