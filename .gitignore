@@ -1,4 +1,26 @@
+# ── Secrets / Config locale ───────────────────────────────────────
 .env
+*.key
+*.pem
+
+# ── Modèles IA (trop lourds pour git) ────────────────────────────
 models/
-data/
 *.gguf
+*.bin
+*.safetensors
+
+# ── Données runtime ───────────────────────────────────────────────
+data/
+
+# ── Captures d'écran (à ajouter manuellement dans docs/) ─────────
+# docs/screenshots/*.png  ← décommente pour ignorer aussi les captures
+
+# ── OS & IDE ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+.idea/
+*.swp
+
+# ── Docker ────────────────────────────────────────────────────────
+.docker/
