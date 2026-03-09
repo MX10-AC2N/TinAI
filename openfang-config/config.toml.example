@@ -1,0 +1,60 @@
+# ══════════════════════════════════════════════════════════════════
+#  TinAI – OpenFang configuration
+#  Ref: https://www.openfang.sh/docs/configuration
+#
+#  Ce fichier est monté dans le conteneur à :
+#    /root/.openfang/config.toml
+#  via le volume openfang-data:/root/.openfang
+#
+#  Pour activer : copiez ce fichier en config.toml dans
+#  le dossier ./data/openfang/ sur l'hôte.
+# ══════════════════════════════════════════════════════════════════
+
+# ── Ports d'écoute ────────────────────────────────────────────────
+# Dashboard web + API REST/WS
+dashboard_listen = "0.0.0.0:4200"
+api_listen        = "0.0.0.0:4200"
+api_key           = "sk-tinai"          # ⚠️ CHANGER / CHANGE THIS
+
+# ── Provider LLM : llama-server local (OpenAI-compatible) ─────────
+# C'est la vraie façon de pointer OpenFang vers llama.cpp
+[default_model]
+provider    = "openai"
+model       = "qwen3-1.7b"             # doit correspondre à --alias dans start-llama.sh
+api_key     = "sk-tinai"               # = TINAI_API_KEY
+base_url    = "http://localhost:8081/v1"
+
+# ── Mémoire ───────────────────────────────────────────────────────
+[memory]
+decay_rate = 0.05
+
+# ── Defaults agents ───────────────────────────────────────────────
+[agents.defaults]
+model       = "qwen3-1.7b"
+temperature = 0.7
+max_tokens  = 4096
+
+# ── Canaux (décommenter selon besoin) ─────────────────────────────
+# [channels.telegram]
+# enabled = true
+# token   = ""    # → TELEGRAM_BOT_TOKEN
+
+# [channels.discord]
+# enabled       = true
+# token         = ""    # → DISCORD_BOT_TOKEN
+# allowed_users = []    # laisser vide = tout le serveur
+
+# [channels.slack]
+# enabled   = true
+# bot_token = ""    # → SLACK_BOT_TOKEN
+# app_token = ""    # → SLACK_APP_TOKEN (socket mode)
+
+# ── Providers LLM externes (optionnel) ───────────────────────────
+# [providers.anthropic]
+# api_key_env = "ANTHROPIC_API_KEY"
+
+# [providers.openai]
+# api_key_env = "OPENAI_API_KEY"
+
+# [providers.groq]
+# api_key_env = "GROQ_API_KEY"
