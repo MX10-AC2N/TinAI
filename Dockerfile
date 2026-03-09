@@ -1,16 +1,14 @@
 # ══════════════════════════════════════════════════════════════════
 #  TinAI v3 – Image unique multi-architecture
 #  Cibles : linux/amd64 · linux/arm64
-#  Contenu : llama.cpp (server) + Open WebUI + OpenFang
-#  Modèle  : Qwen3-1.7B (GGUF, CPU-only, téléchargé au 1er run)
+#  Contenu : llama.cpp + Open WebUI + OpenFang (Rust binary)
+#  Modèle  : configurable via LLAMA_HF_* (téléchargé au 1er run)
 # ══════════════════════════════════════════════════════════════════
-
-# ── ARG globaux (avant tout FROM) ────────────────────────────────
 ARG TARGETARCH
 ARG TARGETPLATFORM
 
 # ══════════════════════════════════════════════════════════════════
-#  Étape 1 : Build llama.cpp
+#  Étape 1 : Build llama.cpp (optimisé AVX2/NEON selon arch)
 # ══════════════════════════════════════════════════════════════════
 FROM debian:bookworm-slim AS llama-builder
 
@@ -23,11 +21,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN git clone --depth=1 https://github.com/ggml-org/llama.cpp /src
 WORKDIR /src
 
-# Flags adaptés à l'architecture cible
 RUN set -eux; \
     CMAKE_EXTRA=""; \
     if [ "${TARGETARCH}" = "arm64" ]; then \
+        # NEON SIMD pour ARM64 (Raspberry Pi 4/5, Apple Silicon)
         CMAKE_EXTRA="-DGGML_NEON=ON"; \
+    elif [ "${TARGETARCH}" = "amd64" ]; then \
+        # AVX2 désactivé volontairement (GGML_NATIVE=OFF) pour compatibilité max
+        # Active -DGGML_AVX2=ON si tu cibles uniquement des CPU récents (>2013)
+        CMAKE_EXTRA="-DGGML_AVX=ON"; \
     fi; \
     cmake -B build \
         -DCMAKE_BUILD_TYPE=Release \
@@ -35,41 +37,73 @@ RUN set -eux; \
         -DLLAMA_BUILD_SERVER=ON \
         -DBUILD_SHARED_LIBS=OFF \
         ${CMAKE_EXTRA} \
-    && cmake --build build --config Release -j$(nproc) --target llama-server
+    && cmake --build build --config Release -j$(nproc) --target llama-server \
+    && strip build/bin/llama-server
 
 # ══════════════════════════════════════════════════════════════════
-#  Étape 2 : Image finale
+#  Étape 2 : Build OpenFang (binaire Rust statique)
+# ══════════════════════════════════════════════════════════════════
+FROM debian:bookworm-slim AS openfang-builder
+
+ARG TARGETARCH
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl git gcc musl-tools ca-certificates \
+    libssl-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Installer Rust toolchain
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- -y --default-toolchain stable --profile minimal
+ENV PATH="/root/.cargo/bin:$PATH"
+
+# Cloner et compiler OpenFang (sans le crate desktop Tauri)
+RUN git clone --depth=1 https://github.com/RightNow-AI/openfang /src
+WORKDIR /src
+
+RUN set -eux; \
+    cargo build --release \
+        --workspace \
+        --exclude openfang-desktop \
+        -p openfang-cli \
+    && cp target/release/openfang /openfang-bin \
+    && strip /openfang-bin
+
+# ══════════════════════════════════════════════════════════════════
+#  Étape 3 : Image finale
 # ══════════════════════════════════════════════════════════════════
 FROM python:3.11-slim-bookworm
 
 ARG TARGETARCH
 ARG TARGETPLATFORM
 
-LABEL org.opencontainers.image.title="TinAI v3"
-LABEL org.opencontainers.image.description="llama.cpp + Open WebUI + OpenFang – image unique multi-arch"
+LABEL org.opencontainers.image.title="TinAI"
+LABEL org.opencontainers.image.description="llama.cpp + Open WebUI + OpenFang – offline AI stack"
 LABEL org.opencontainers.image.source="https://github.com/MX10-AC2N/TinAI"
 LABEL org.opencontainers.image.architecture="${TARGETPLATFORM}"
+LABEL org.opencontainers.image.licenses="MIT"
 
-# Dépendances runtime
+# Dépendances runtime (curl pour healthchecks, supervisor pour orchestration)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates libssl3 \
     supervisor procps wget \
     && rm -rf /var/lib/apt/lists/*
 
-# ── llama.cpp server ──────────────────────────────────────────────
+# ── llama-server (optimisé AVX/NEON) ─────────────────────────────
 COPY --from=llama-builder /src/build/bin/llama-server /usr/local/bin/llama-server
 
-# ── Open WebUI (package PyPI – supporte nativement amd64 + arm64) ─
+# ── OpenFang (binaire Rust natif) ────────────────────────────────
+COPY --from=openfang-builder /openfang-bin /usr/local/bin/openfang
+
+# ── Open WebUI (PyPI — amd64 + arm64 natif) ──────────────────────
 RUN pip install --no-cache-dir \
     open-webui \
     huggingface_hub \
-    && pip cache purge
-
-# ── OpenFang ──────────────────────────────────────────────────────
-RUN pip install --no-cache-dir openfang 2>/dev/null \
-    || pip install --no-cache-dir \
-        git+https://github.com/openfang/openfang.git 2>/dev/null \
-    || echo "openfang-unavailable"
+    && pip cache purge \
+    # Nettoyage agressif : __pycache__, tests, docs inutiles
+    && find /usr/local/lib/python3.11 -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true \
+    && find /usr/local/lib/python3.11 -type d -name "tests"       -exec rm -rf {} + 2>/dev/null || true \
+    && find /usr/local/lib/python3.11 -name "*.pyc"               -delete 2>/dev/null || true
 
 # ── Répertoires de données ────────────────────────────────────────
 RUN mkdir -p \
@@ -89,10 +123,11 @@ RUN chmod +x \
     /usr/local/bin/start-llama.sh \
     /usr/local/bin/start-webui.sh \
     /usr/local/bin/start-openfang.sh \
-    /usr/local/bin/healthcheck.sh
+    /usr/local/bin/healthcheck.sh \
+    /usr/local/bin/openfang
 
 # ── Variables d'environnement par défaut ──────────────────────────
-ENV LLAMA_MODEL_PATH=/data/models/qwen3-1.7b.gguf \
+ENV LLAMA_MODEL_PATH=/data/models/model.gguf \
     LLAMA_HF_REPO=Qwen/Qwen3-1.7B-GGUF \
     LLAMA_HF_FILE=qwen3-1.7b-q5_k_m.gguf \
     LLAMA_CTX_SIZE=8192 \
