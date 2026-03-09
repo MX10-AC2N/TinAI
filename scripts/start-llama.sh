@@ -1,11 +1,10 @@
 #!/bin/bash
 # ── Démarrage llama-server ────────────────────────────────────────
 # set -euo pipefail supprimé : supervisord relancerait sur moindre erreur.
-# Chaque étape gère ses erreurs explicitement.
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-MODEL_PATH="${LLAMA_MODEL_PATH:-/data/models/qwen3-1.7b-q5_k_m.gguf}"
+MODEL_PATH="${LLAMA_MODEL_PATH:-/data/models/model.gguf}"
 HF_REPO="${LLAMA_HF_REPO:-Qwen/Qwen3-1.7B-GGUF}"
 HF_FILE="${LLAMA_HF_FILE:-qwen3-1.7b-q5_k_m.gguf}"
 CTX="${LLAMA_CTX_SIZE:-8192}"
@@ -14,23 +13,28 @@ GPU_LAYERS="${LLAMA_GPU_LAYERS:-0}"
 PORT="${LLAMA_PORT:-8081}"
 API_KEY="${TINAI_API_KEY:-sk-tinai}"
 
-echo "[llama] Démarrage llama-server..."
-echo "[llama] Modèle attendu : ${MODEL_PATH}"
+# ── Alias dynamique dérivé du nom de fichier ──────────────────────
+# qwen3-1.7b-q5_k_m.gguf            → qwen3-1.7b
+# mistral-7b-instruct-v0.2.Q4_K_M.gguf → mistral-7b-instruct-v0.2
+MODEL_ALIAS=$(echo "${HF_FILE}" | sed 's/[.-][qQ][0-9][^.]*\.gguf$//' | sed 's/\.gguf$//')
 
-# ── Vérification du binaire llama-server ──────────────────────────
+echo "[llama] Démarrage llama-server..."
+echo "[llama] Modèle  : ${MODEL_PATH}"
+echo "[llama] Alias   : ${MODEL_ALIAS}"
+
+# ── Vérification du binaire ───────────────────────────────────────
 if [ ! -x "/usr/local/bin/llama-server" ]; then
-    echo "[llama] ✗ FATAL : /usr/local/bin/llama-server introuvable ou non exécutable"
+    echo "[llama] ✗ FATAL : /usr/local/bin/llama-server introuvable"
     exit 1
 fi
 
-# ── Téléchargement automatique du modèle si absent ────────────────
+# ── Téléchargement automatique si absent ─────────────────────────
 if [ ! -f "${MODEL_PATH}" ]; then
     echo "[llama] Modèle absent – téléchargement depuis HuggingFace..."
     echo "[llama] Repo    : ${HF_REPO}"
     echo "[llama] Fichier : ${HF_FILE}"
 
     mkdir -p "$(dirname "${MODEL_PATH}")"
-
     DOWNLOAD_OK=0
 
     # Tentative 1 : huggingface_hub (Python)
@@ -98,15 +102,14 @@ else
     echo "[llama] ✓ Modèle trouvé : ${MODEL_PATH}"
 fi
 
-# ── Lancement llama-server ────────────────────────────────────────
-echo "[llama] Lancement sur le port ${PORT} avec ${THREADS} threads..."
+# ── Lancement ─────────────────────────────────────────────────────
+echo "[llama] Lancement sur :${PORT} | threads=${THREADS} | ctx=${CTX}"
 exec /usr/local/bin/llama-server \
-    --model "${MODEL_PATH}" \
-    --ctx-size "${CTX}" \
-    --threads "${THREADS}" \
+    --model        "${MODEL_PATH}" \
+    --ctx-size     "${CTX}" \
+    --threads      "${THREADS}" \
     --n-gpu-layers "${GPU_LAYERS}" \
-    --host 0.0.0.0 \
-    --port "${PORT}" \
-    --api-key "${API_KEY}" \
-    --alias qwen3-1.7b \
-    --log-disable
+    --host         0.0.0.0 \
+    --port         "${PORT}" \
+    --api-key      "${API_KEY}" \
+    --alias        "${MODEL_ALIAS}"
