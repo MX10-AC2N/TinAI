@@ -1,17 +1,16 @@
 # ══════════════════════════════════════════════════════════════════
-#  TinAI v3 – Image unique multi-architecture
+#  TinAI – Image unique multi-architecture
 #  Cibles : linux/amd64 · linux/arm64
-#  Contenu : llama.cpp + Open WebUI + OpenFang (Rust binary)
+#  Contenu : llama.cpp + Open CoreUI (Rust) + OpenFang (Rust)
 #  Modèle  : configurable via LLAMA_HF_* (téléchargé au 1er run)
 # ══════════════════════════════════════════════════════════════════
 ARG TARGETARCH
 ARG TARGETPLATFORM
 
 # ══════════════════════════════════════════════════════════════════
-#  Étape 1 : Build llama.cpp (optimisé AVX2/NEON selon arch)
+#  Étape 1 : Build llama.cpp (optimisé AVX/NEON selon arch)
 # ══════════════════════════════════════════════════════════════════
 FROM debian:bookworm-slim AS llama-builder
-
 ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -24,11 +23,8 @@ WORKDIR /src
 RUN set -eux; \
     CMAKE_EXTRA=""; \
     if [ "${TARGETARCH}" = "arm64" ]; then \
-        # NEON SIMD pour ARM64 (Raspberry Pi 4/5, Apple Silicon)
         CMAKE_EXTRA="-DGGML_NEON=ON"; \
     elif [ "${TARGETARCH}" = "amd64" ]; then \
-        # AVX2 désactivé volontairement (GGML_NATIVE=OFF) pour compatibilité max
-        # Active -DGGML_AVX2=ON si tu cibles uniquement des CPU récents (>2013)
         CMAKE_EXTRA="-DGGML_AVX=ON"; \
     fi; \
     cmake -B build \
@@ -41,10 +37,9 @@ RUN set -eux; \
     && strip build/bin/llama-server
 
 # ══════════════════════════════════════════════════════════════════
-#  Étape 2 : Build OpenFang (binaire Rust statique)
+#  Étape 2 : Build OpenFang (binaire Rust)
 # ══════════════════════════════════════════════════════════════════
 FROM debian:bookworm-slim AS openfang-builder
-
 ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -52,12 +47,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# Installer Rust toolchain
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
     | sh -s -- -y --default-toolchain stable --profile minimal
 ENV PATH="/root/.cargo/bin:$PATH"
 
-# Cloner et compiler OpenFang (sans le crate desktop Tauri)
 RUN git clone --depth=1 https://github.com/RightNow-AI/openfang /src
 WORKDIR /src
 
@@ -70,45 +63,69 @@ RUN set -eux; \
     && strip /openfang-bin
 
 # ══════════════════════════════════════════════════════════════════
-#  Étape 3 : Image finale
+#  Étape 3 : Téléchargement Open CoreUI (binaire Rust ~60 MB)
+#  Releases : https://github.com/xxnuo/open-coreui/releases
 # ══════════════════════════════════════════════════════════════════
-FROM python:3.11-slim-bookworm
+FROM debian:bookworm-slim AS coreui-fetcher
+ARG TARGETARCH
+
+# Version figée — à bumper manuellement lors des releases
+ARG COREUI_VERSION=0.9.6
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+        amd64) TRIPLE="x86_64-unknown-linux-gnu" ;; \
+        arm64) TRIPLE="aarch64-unknown-linux-gnu" ;; \
+        *) echo "Architecture non supportée : ${TARGETARCH}" && exit 1 ;; \
+    esac; \
+    curl -fSL \
+        "https://github.com/xxnuo/open-coreui/releases/download/v${COREUI_VERSION}/open-coreui-${COREUI_VERSION}-${TRIPLE}" \
+        -o /coreui-bin \
+    && chmod +x /coreui-bin
+
+# ══════════════════════════════════════════════════════════════════
+#  Étape 4 : Image finale (debian slim — plus de Python !)
+# ══════════════════════════════════════════════════════════════════
+FROM debian:bookworm-slim
 
 ARG TARGETARCH
 ARG TARGETPLATFORM
+ARG COREUI_VERSION=0.9.6
 
 LABEL org.opencontainers.image.title="TinAI"
-LABEL org.opencontainers.image.description="llama.cpp + Open WebUI + OpenFang – offline AI stack"
+LABEL org.opencontainers.image.description="llama.cpp + Open CoreUI + OpenFang – offline AI stack"
 LABEL org.opencontainers.image.source="https://github.com/MX10-AC2N/TinAI"
 LABEL org.opencontainers.image.architecture="${TARGETPLATFORM}"
 LABEL org.opencontainers.image.licenses="MIT"
 
-# Dépendances runtime (curl pour healthchecks, supervisor pour orchestration)
+# Runtime minimal : curl (healthchecks), supervisor, wget (fallback download), libssl
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates libssl3 \
-    supervisor procps wget \
+    supervisor procps wget python3 python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# ── llama-server (optimisé AVX/NEON) ─────────────────────────────
-COPY --from=llama-builder /src/build/bin/llama-server /usr/local/bin/llama-server
+# huggingface_hub pour le téléchargement du modèle (bien plus léger que open-webui)
+RUN pip3 install --no-cache-dir --break-system-packages huggingface_hub \
+    && pip3 cache purge
 
-# ── OpenFang (binaire Rust natif) ────────────────────────────────
-COPY --from=openfang-builder /openfang-bin /usr/local/bin/openfang
+# ── Binaires ──────────────────────────────────────────────────────
+COPY --from=llama-builder    /src/build/bin/llama-server /usr/local/bin/llama-server
+COPY --from=openfang-builder /openfang-bin               /usr/local/bin/openfang
+COPY --from=coreui-fetcher   /coreui-bin                 /usr/local/bin/open-coreui
 
-# ── Open WebUI (PyPI — amd64 + arm64 natif) ──────────────────────
-RUN pip install --no-cache-dir \
-    open-webui \
-    huggingface_hub \
-    && pip cache purge \
-    # Nettoyage agressif : __pycache__, tests, docs inutiles
-    && find /usr/local/lib/python3.11 -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true \
-    && find /usr/local/lib/python3.11 -type d -name "tests"       -exec rm -rf {} + 2>/dev/null || true \
-    && find /usr/local/lib/python3.11 -name "*.pyc"               -delete 2>/dev/null || true
+RUN chmod +x \
+    /usr/local/bin/llama-server \
+    /usr/local/bin/openfang \
+    /usr/local/bin/open-coreui
 
 # ── Répertoires de données ────────────────────────────────────────
 RUN mkdir -p \
     /data/models \
-    /data/webui \
+    /data/coreui \
     /data/openfang \
     /var/log/tinai
 
@@ -123,10 +140,9 @@ RUN chmod +x \
     /usr/local/bin/start-llama.sh \
     /usr/local/bin/start-webui.sh \
     /usr/local/bin/start-openfang.sh \
-    /usr/local/bin/healthcheck.sh \
-    /usr/local/bin/openfang
+    /usr/local/bin/healthcheck.sh
 
-# ── Variables d'environnement par défaut ──────────────────────────
+# ── Variables d'environnement ─────────────────────────────────────
 ENV LLAMA_MODEL_PATH=/data/models/model.gguf \
     LLAMA_HF_REPO=Qwen/Qwen3-1.7B-GGUF \
     LLAMA_HF_FILE=qwen3-1.7b-q5_k_m.gguf \
@@ -138,9 +154,10 @@ ENV LLAMA_MODEL_PATH=/data/models/model.gguf \
     WEBUI_SECRET_KEY=tinai-secret-change-me \
     OPENFANG_PORT=4200 \
     TINAI_API_KEY=sk-tinai \
+    COREUI_VERSION=${COREUI_VERSION} \
     DATA_DIR=/data
 
-VOLUME ["/data/models", "/data/webui", "/data/openfang"]
+VOLUME ["/data/models", "/data/coreui", "/data/openfang"]
 
 EXPOSE 3000 4200 8081
 

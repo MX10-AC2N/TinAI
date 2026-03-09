@@ -1,0 +1,12 @@
+# ── Ne pas envoyer au daemon Docker lors du build ─────────────────
+.env
+.git/
+.github/
+models/
+data/
+*.gguf
+*.bin
+*.safetensors
+docs/screenshots/
+TEST-REPORT*.md
+VISIBILITY-GUIDE.md
