@@ -23,8 +23,8 @@ services:
 
     volumes:
       - ${MODELS_DIR:-./models}:/data/models              # Modèles GGUF
-      - ${WEBUI_DATA_DIR:-./data/coreui}:/data/coreui       # BDD CoreUI
-      - ${OPENFANG_DATA_DIR:-./data/openfang}:/data/openfang  # Agents & config
+      - ${WEBUI_DATA_DIR:-./data/webui}:/app/backend/data       # BDD WebUI
+      - ${OPENFANG_DATA_DIR:-./data/openfang}:/root/.openfang  # Config & agents (→ /root/.openfang)
       - tinai-logs:/var/log/tinai                         # Logs partagés avec monitor
 
     environment:

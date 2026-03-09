@@ -29,7 +29,7 @@ wget -O models/qwen3-1.7b-q5_k_m.gguf \
 docker compose up -d
 ```
 
-### Open CoreUI not loading (port 3000)
+### Open WebUI not loading (port 3000)
 
 ```bash
 # Check WebUI logs
@@ -117,7 +117,7 @@ wget -O models/qwen3-1.7b-q5_k_m.gguf \
 docker compose up -d
 ```
 
-### Open CoreUI ne charge pas (port 3000)
+### Open WebUI ne charge pas (port 3000)
 
 ```bash
 docker compose exec tinai tail -30 /var/log/tinai/webui.log

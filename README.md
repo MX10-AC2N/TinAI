@@ -10,9 +10,9 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-orange.svg)](./LICENSE)
 [![Version](https://img.shields.io/badge/version-3.1.0-blue)](https://github.com/MX10-AC2N/TinAI/releases)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io-2496ED?logo=docker)](https://ghcr.io/MX10-AC2N/tinai)
-[![OpenFang](https://img.shields.io/badge/OpenFang-v0.1-brightgreen)](https://openfang.sh)
+[![OpenFang](https://img.shields.io/badge/OpenFang-pre--1.0-brightgreen)](https://openfang.sh)
 [![llama.cpp](https://img.shields.io/badge/llama.cpp-latest-orange)](https://github.com/ggml-org/llama.cpp)
-[![Open CoreUI](https://img.shields.io/badge/Open_CoreUI-v0.9.6-purple)](https://github.com/xxnuo/open-coreui)
+[![Open WebUI](https://img.shields.io/badge/Open_WebUI-latest-blue)](https://github.com/open-webui/open-webui)
 
 [🇫🇷 Français](#-démarrage-rapide) · [🇬🇧 English](#-quick-start-english)
 
@@ -24,10 +24,10 @@
 
 <div align="center">
 
-| Open CoreUI Chat | OpenFang Dashboard | API Terminal |
+| Open WebUI Chat | OpenFang Dashboard | API Terminal |
 |---|---|---|
-| ![Open CoreUI](docs/screenshots/webui-placeholder.png) | ![OpenFang](docs/screenshots/openfang-placeholder.png) | ![API](docs/screenshots/api-placeholder.png) |
-| *Interface de chat (port 3000)* | *Agents autonomes (port 4200)* | *API OpenAI-compatible (port 8081)* |
+| ![Open WebUI](docs/screenshots/webui-placeholder.png) | ![OpenFang](docs/screenshots/openfang-placeholder.png) | ![API](docs/screenshots/api-placeholder.png) |
+| *Interface de chat – Open WebUI (port 3000)* | *Agents autonomes (port 4200)* | *API OpenAI-compatible (port 8081)* |
 
 > 📸 *Placeholders — remplace ces images par des captures réelles dans `docs/screenshots/`*
 
@@ -54,7 +54,7 @@ Le modèle **Qwen3-1.7B** (~1.4 GB) est téléchargé automatiquement au premier
 
 | Service | URL | Description |
 |---|---|---|
-| 🌐 **Open CoreUI** | http://localhost:3000 | Interface de chat |
+| 🌐 **Open WebUI** | http://localhost:3000 | Interface de chat |
 | 🤖 **OpenFang** | http://localhost:4200 | Dashboard agents IA autonomes |
 | ⚡ **llama-server** | http://localhost:8081 | API OpenAI-compatible |
 
@@ -79,7 +79,7 @@ The **Qwen3-1.7B** model (~1.4 GB) downloads automatically on first start.
 
 | Service | URL | Description |
 |---|---|---|
-| 🌐 **Open CoreUI** | http://localhost:3000 | Chat interface |
+| 🌐 **Open WebUI** | http://localhost:3000 | Chat interface |
 | 🤖 **OpenFang** | http://localhost:4200 | Autonomous AI agents dashboard |
 | ⚡ **llama-server** | http://localhost:8081 | OpenAI-compatible API |
 
@@ -167,20 +167,31 @@ const chat = await client.chat.completions.create({
 console.log(chat.choices[0].message.content);
 ```
 
-### 🤖 OpenFang — Activer un agent autonome
+### 🤖 OpenFang — Agent OS autonome
+
+OpenFang est un **Agent OS** en Rust avec 7 agents autonomes (Hands), 40 canaux de messagerie, 27 providers LLM et 16 couches de sécurité. Dans TinAI il utilise **llama-server local** comme LLM par défaut.
 
 ```bash
-# Depuis l'intérieur du conteneur
+# Activer un agent autonome (Hands)
 docker compose exec tinai openfang hand activate researcher
+docker compose exec tinai openfang hand activate lead
+docker compose exec tinai openfang hand list
 
-# Voir le statut
+# Voir le statut des agents
 docker compose exec tinai openfang hand status researcher
 
-# Lancer une tâche via l'API OpenFang
+# Chat direct en CLI
+docker compose exec tinai openfang chat
+
+# API OpenAI-compatible
 curl http://localhost:4200/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"researcher","messages":[{"role":"user","content":"Analyse les tendances IA de 2025"}]}'
+  -H "Authorization: Bearer sk-tinai" \
+  -d '{"model":"qwen3-1.7b","messages":[{"role":"user","content":"Analyse les tendances IA de 2025"}]}'
 ```
+
+> 💡 La config OpenFang est dans `./data/openfang/config.toml` — générée automatiquement au 1er démarrage.  
+> Voir [openfang.sh/docs/configuration](https://www.openfang.sh/docs/configuration) pour les 62 variables disponibles.
 
 ### 🖥️ Intégration VS Code
 
@@ -282,23 +293,25 @@ docker compose down && docker compose up --build
 ## 🏗️ Architecture
 
 ```
-┌──────────────────────────────────────────────┐
-│  Conteneur TinAI (supervisord)               │
-│                                              │
-│  ┌─────────────────┐  ┌───────────────────┐ │
-│  │  llama-server   │  │   Open CoreUI      │ │
-│  │  :8081          │◄─┤   :3000           │ │
-│  │  Qwen3-1.7B     │  │   (chat UI)       │ │
-│  └─────────────────┘  └───────────────────┘ │
-│           ▲            ┌───────────────────┐ │
-│           └────────────┤   OpenFang        │ │
-│                        │   :4200 (agents)  │ │
-│                        └───────────────────┘ │
-└──────────────────────────────────────────────┘
-        │ volumes Docker
-  ./models     → /data/models    (fichiers .gguf)
-  ./data/coreui → /data/coreui     (base de données WebUI)
-  ./data/fang  → /data/openfang  (agents & config)
+┌──────────────────────────────────────────────────┐
+│  Conteneur TinAI (supervisord)                   │
+│                                                  │
+│  ┌──────────────────┐  ┌────────────────────┐   │
+│  │  llama-server    │  │   Open WebUI       │   │
+│  │  :8081           │◄─┤   :3000            │   │
+│  │  ~32MB · Rust    │  │   Python 3.11      │   │
+│  └──────────────────┘  └────────────────────┘   │
+│           ▲              ┌────────────────────┐  │
+│           └──────────────┤   OpenFang         │  │
+│                          │   :4200 (dashboard)│  │
+│                          │   ~32MB · Rust     │  │
+│                          │   7 Hands · 40 ch. │  │
+│                          └────────────────────┘  │
+└──────────────────────────────────────────────────┘
+          │ volumes Docker
+  ./models          → /data/models      (fichiers .gguf)
+  ./data/webui      → /app/backend/data (BDD Open WebUI)
+  ./data/openfang   → /root/.openfang   (config.toml + agents)
 ```
 
 ---
@@ -341,6 +354,6 @@ Voir [CONTRIBUTING.md](./CONTRIBUTING.md) · See [CONTRIBUTING.md](./CONTRIBUTIN
 
 <div align="center">
 
-**Built with ❤️ using [llama.cpp](https://github.com/ggml-org/llama.cpp) · [Open CoreUI](https://github.com/xxnuo/open-coreui) · [OpenFang](https://openfang.sh)**
+**Built with ❤️ using [llama.cpp](https://github.com/ggml-org/llama.cpp) · [Open WebUI](https://github.com/open-webui/open-webui) · [OpenFang](https://openfang.sh)**
 
 </div>

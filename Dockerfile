@@ -1,7 +1,7 @@
 # ══════════════════════════════════════════════════════════════════
 #  TinAI – Image unique multi-architecture
 #  Cibles : linux/amd64 · linux/arm64
-#  Contenu : llama.cpp + Open CoreUI (Rust) + OpenFang (Rust)
+#  Contenu : llama.cpp + Open WebUI + OpenFang (Rust binary)
 #  Modèle  : configurable via LLAMA_HF_* (téléchargé au 1er run)
 # ══════════════════════════════════════════════════════════════════
 ARG TARGETARCH
@@ -63,70 +63,46 @@ RUN set -eux; \
     && strip /openfang-bin
 
 # ══════════════════════════════════════════════════════════════════
-#  Étape 3 : Téléchargement Open CoreUI (binaire Rust ~60 MB)
-#  Releases : https://github.com/xxnuo/open-coreui/releases
+#  Étape 3 : Image finale (Python 3.11 — requis par Open WebUI)
 # ══════════════════════════════════════════════════════════════════
-FROM debian:bookworm-slim AS coreui-fetcher
-ARG TARGETARCH
-
-# Version figée — à bumper manuellement lors des releases
-ARG COREUI_VERSION=0.9.6
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN set -eux; \
-    case "${TARGETARCH}" in \
-        amd64) TRIPLE="x86_64-unknown-linux-gnu" ;; \
-        arm64) TRIPLE="aarch64-unknown-linux-gnu" ;; \
-        *) echo "Architecture non supportée : ${TARGETARCH}" && exit 1 ;; \
-    esac; \
-    curl -fSL \
-        "https://github.com/xxnuo/open-coreui/releases/download/v${COREUI_VERSION}/open-coreui-${COREUI_VERSION}-${TRIPLE}" \
-        -o /coreui-bin \
-    && chmod +x /coreui-bin
-
-# ══════════════════════════════════════════════════════════════════
-#  Étape 4 : Image finale (debian slim — plus de Python !)
-# ══════════════════════════════════════════════════════════════════
-FROM debian:bookworm-slim
+FROM python:3.11-slim-bookworm
 
 ARG TARGETARCH
 ARG TARGETPLATFORM
-ARG COREUI_VERSION=0.9.6
 
 LABEL org.opencontainers.image.title="TinAI"
-LABEL org.opencontainers.image.description="llama.cpp + Open CoreUI + OpenFang – offline AI stack"
+LABEL org.opencontainers.image.description="llama.cpp + Open WebUI + OpenFang – offline AI stack"
 LABEL org.opencontainers.image.source="https://github.com/MX10-AC2N/TinAI"
 LABEL org.opencontainers.image.architecture="${TARGETPLATFORM}"
 LABEL org.opencontainers.image.licenses="MIT"
 
-# Runtime minimal : curl (healthchecks), supervisor, wget (fallback download), libssl
+# Runtime : curl (healthchecks), supervisor, wget (fallback download)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates libssl3 \
-    supervisor procps wget python3 python3-pip \
+    supervisor procps wget \
     && rm -rf /var/lib/apt/lists/*
 
-# huggingface_hub pour le téléchargement du modèle (bien plus léger que open-webui)
-RUN pip3 install --no-cache-dir --break-system-packages huggingface_hub \
-    && pip3 cache purge
+# ── Open WebUI + huggingface_hub ──────────────────────────────────
+# DATA_DIR pointe vers /app/backend/data (convention Open WebUI)
+RUN pip install --no-cache-dir \
+    open-webui \
+    huggingface_hub \
+    && pip cache purge \
+    && find /usr/local/lib/python3.11 -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true \
+    && find /usr/local/lib/python3.11 -type d -name "tests"       -exec rm -rf {} + 2>/dev/null || true \
+    && find /usr/local/lib/python3.11 -name "*.pyc"               -delete 2>/dev/null || true
 
-# ── Binaires ──────────────────────────────────────────────────────
+# ── Binaires compilés ─────────────────────────────────────────────
 COPY --from=llama-builder    /src/build/bin/llama-server /usr/local/bin/llama-server
 COPY --from=openfang-builder /openfang-bin               /usr/local/bin/openfang
-COPY --from=coreui-fetcher   /coreui-bin                 /usr/local/bin/open-coreui
 
-RUN chmod +x \
-    /usr/local/bin/llama-server \
-    /usr/local/bin/openfang \
-    /usr/local/bin/open-coreui
+RUN chmod +x /usr/local/bin/llama-server /usr/local/bin/openfang
 
 # ── Répertoires de données ────────────────────────────────────────
 RUN mkdir -p \
     /data/models \
-    /data/coreui \
-    /data/openfang \
+    /app/backend/data \
+    /root/.openfang \
     /var/log/tinai
 
 # ── Scripts & config ──────────────────────────────────────────────
@@ -152,12 +128,13 @@ ENV LLAMA_MODEL_PATH=/data/models/model.gguf \
     LLAMA_PORT=8081 \
     WEBUI_PORT=3000 \
     WEBUI_SECRET_KEY=tinai-secret-change-me \
+    WEBUI_AUTH=True \
     OPENFANG_PORT=4200 \
     TINAI_API_KEY=sk-tinai \
-    COREUI_VERSION=${COREUI_VERSION} \
-    DATA_DIR=/data
+    DATA_DIR=/data \
+    HOME=/root
 
-VOLUME ["/data/models", "/data/coreui", "/data/openfang"]
+VOLUME ["/data/models", "/app/backend/data", "/root/.openfang"]
 
 EXPOSE 3000 4200 8081
 
