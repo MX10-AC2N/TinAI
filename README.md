@@ -1,76 +1,256 @@
-# TinAI v3 🧠
+<div align="center">
 
-[![CI – amd64](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml)
-[![Test Report amd64](https://img.shields.io/badge/test--report-amd64-blue)](./TEST-REPORT.md)
-[![Test Report arm64](https://img.shields.io/badge/test--report-arm64-blueviolet)](./TEST-REPORT.md)
-[![Version](https://img.shields.io/badge/version-3.0.0-green)](https://github.com/MX10-AC2N/TinAI/releases)
-[![License](https://img.shields.io/badge/license-MIT-orange)](./LICENSE)
+# 🧠 TinAI
 
-**Un seul conteneur Docker.** llama.cpp + Open WebUI + OpenFang + Qwen3-1.7B.  
-100 % offline, CPU-only, ~3–4 GB RAM.
+**Local AI stack — 100% offline, CPU-only, one Docker container.**  
+**Stack IA locale — 100 % offline, CPU only, un seul conteneur Docker.**
+
+[![CI amd64](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml)
+[![CI arm64](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml/badge.svg?branch=main&label=arm64)](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-orange.svg)](./LICENSE)
+[![Version](https://img.shields.io/badge/version-3.1.0-blue)](https://github.com/MX10-AC2N/TinAI/releases)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io-2496ED?logo=docker)](https://ghcr.io/MX10-AC2N/tinai)
+[![OpenFang](https://img.shields.io/badge/OpenFang-v0.1-brightgreen)](https://openfang.sh)
+[![llama.cpp](https://img.shields.io/badge/llama.cpp-latest-orange)](https://github.com/ggml-org/llama.cpp)
+[![Open WebUI](https://img.shields.io/badge/Open_WebUI-latest-purple)](https://github.com/open-webui/open-webui)
+
+[🇫🇷 Français](#-démarrage-rapide) · [🇬🇧 English](#-quick-start-english)
+
+</div>
 
 ---
 
-## Démarrage rapide
+## 🖼️ Screenshots / Captures d'écran
+
+<div align="center">
+
+| Open WebUI Chat | OpenFang Dashboard | API Terminal |
+|---|---|---|
+| ![Open WebUI](docs/screenshots/webui-placeholder.png) | ![OpenFang](docs/screenshots/openfang-placeholder.png) | ![API](docs/screenshots/api-placeholder.png) |
+| *Interface de chat (port 3000)* | *Agents autonomes (port 4200)* | *API OpenAI-compatible (port 8081)* |
+
+> 📸 *Placeholders — remplace ces images par des captures réelles dans `docs/screenshots/`*
+
+</div>
+
+---
+
+## 🇫🇷 Démarrage rapide
 
 ```bash
-# 1. Cloner / copier le projet
+# 1. Cloner le projet
 git clone https://github.com/MX10-AC2N/TinAI.git && cd TinAI
 
 # 2. (Optionnel) Personnaliser
 cp .env.example .env && nano .env
 
-# 3. Build & run
+# 3. Build & lancement
 docker compose up --build
 ```
 
-Le modèle **Qwen3-1.7B** est téléchargé automatiquement au premier démarrage (~1.4 GB).
+Le modèle **Qwen3-1.7B** (~1.4 GB) est téléchargé automatiquement au premier démarrage.
 
----
+**Services disponibles :**
 
-## Services inclus
-
-| Service | Port | Description |
+| Service | URL | Description |
 |---|---|---|
-| **Open WebUI** | `3000` | Interface chat (http://localhost:3000) |
-| **OpenFang** | `4200` | Agents IA autonomes |
-| **llama-server** | `8081` | API OpenAI-compatible |
+| 🌐 **Open WebUI** | http://localhost:3000 | Interface de chat |
+| 🤖 **OpenFang** | http://localhost:4200 | Dashboard agents IA autonomes |
+| ⚡ **llama-server** | http://localhost:8081 | API OpenAI-compatible |
 
 ---
 
-## Configuration `.env`
+## 🇬🇧 Quick Start (English)
+
+```bash
+# 1. Clone the project
+git clone https://github.com/MX10-AC2N/TinAI.git && cd TinAI
+
+# 2. (Optional) Customize
+cp .env.example .env && nano .env
+
+# 3. Build & start
+docker compose up --build
+```
+
+The **Qwen3-1.7B** model (~1.4 GB) downloads automatically on first start.
+
+**Available services:**
+
+| Service | URL | Description |
+|---|---|---|
+| 🌐 **Open WebUI** | http://localhost:3000 | Chat interface |
+| 🤖 **OpenFang** | http://localhost:4200 | Autonomous AI agents dashboard |
+| ⚡ **llama-server** | http://localhost:8081 | OpenAI-compatible API |
+
+---
+
+## 🔒 Sécurité / Security
+
+> ⚠️ **IMPORTANT — Avant toute exposition réseau / Before any network exposure:**
+
+```bash
+# FR: Génère des clés sécurisées dans .env
+# EN: Generate secure keys in .env
+TINAI_API_KEY=$(openssl rand -hex 32)
+WEBUI_SECRET_KEY=$(openssl rand -hex 32)
+```
+
+Ne déploie jamais avec les valeurs par défaut `sk-tinai` / `tinai-secret-change-me` sur un réseau public.  
+*Never deploy with default values `sk-tinai` / `tinai-secret-change-me` on a public network.*
+
+---
+
+## 📦 Exemples d'utilisation / Usage Examples
+
+### 💬 Chat API (cURL)
+
+```bash
+# FR: Requête simple au modèle
+# EN: Simple model request
+curl http://localhost:8081/v1/chat/completions \
+  -H "Authorization: Bearer ${TINAI_API_KEY:-sk-tinai}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "tinai",
+    "messages": [
+      {"role": "system", "content": "Tu es un assistant utile."},
+      {"role": "user",   "content": "Explique Docker en 3 phrases."}
+    ],
+    "stream": false
+  }'
+```
+
+### 🔄 Streaming
+
+```bash
+curl http://localhost:8081/v1/chat/completions \
+  -H "Authorization: Bearer ${TINAI_API_KEY:-sk-tinai}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"tinai","messages":[{"role":"user","content":"Hello!"}],"stream":true}'
+```
+
+### 🐍 Python (OpenAI SDK)
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://localhost:8081/v1",
+    api_key="sk-tinai",  # remplace par ta vraie clé
+)
+
+response = client.chat.completions.create(
+    model="tinai",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user",   "content": "What is llama.cpp?"},
+    ],
+)
+print(response.choices[0].message.content)
+```
+
+### 🟨 JavaScript / Node.js
+
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "http://localhost:8081/v1",
+  apiKey: "sk-tinai",
+});
+
+const chat = await client.chat.completions.create({
+  model: "tinai",
+  messages: [{ role: "user", content: "Bonjour !" }],
+});
+console.log(chat.choices[0].message.content);
+```
+
+### 🤖 OpenFang — Activer un agent autonome
+
+```bash
+# Depuis l'intérieur du conteneur
+docker compose exec tinai openfang hand activate researcher
+
+# Voir le statut
+docker compose exec tinai openfang hand status researcher
+
+# Lancer une tâche via l'API OpenFang
+curl http://localhost:4200/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"researcher","messages":[{"role":"user","content":"Analyse les tendances IA de 2025"}]}'
+```
+
+### 🖥️ Intégration VS Code
+
+Installe l'extension **Continue** ([marketplace](https://marketplace.visualstudio.com/items?itemName=Continue.continue)) puis ajoute dans `~/.continue/config.json` :
+
+```json
+{
+  "models": [
+    {
+      "title": "TinAI (local)",
+      "provider": "openai",
+      "model": "tinai",
+      "apiBase": "http://localhost:8081/v1",
+      "apiKey": "sk-tinai"
+    }
+  ]
+}
+```
+
+---
+
+## ⚙️ Configuration `.env`
 
 | Variable | Défaut | Description |
 |---|---|---|
 | `LLAMA_HF_REPO` | `Qwen/Qwen3-1.7B-GGUF` | Repo HuggingFace du modèle |
-| `LLAMA_HF_FILE` | `qwen3-1.7b-q5_k_m.gguf` | Fichier GGUF à télécharger |
-| `LLAMA_CTX_SIZE` | `8192` | Taille de contexte (tokens) |
-| `LLAMA_THREADS` | `4` | Threads CPU |
-| `LLAMA_GPU_LAYERS` | `0` | Couches GPU (0 = CPU only) |
-| `MEM_LIMIT` | `6g` | Limite RAM du conteneur |
-| `PORT_WEBUI` | `3000` | Port Open WebUI |
-| `PORT_OPENFANG` | `4200` | Port OpenFang |
-| `PORT_LLAMA` | `8081` | Port llama-server |
-| `TINAI_API_KEY` | `sk-tinai` | Clé API partagée |
+| `LLAMA_HF_FILE` | `qwen3-1.7b-q5_k_m.gguf` | Fichier GGUF |
+| `LLAMA_CTX_SIZE` | `8192` | Contexte en tokens |
+| `LLAMA_THREADS` | `4` | Threads CPU (= cœurs physiques) |
+| `LLAMA_GPU_LAYERS` | `0` | `0` = CPU only, `-1` = tout GPU |
+| `MEM_LIMIT` | `6g` | RAM max du conteneur |
+| `TINAI_API_KEY` | `sk-tinai` | ⚠️ **À changer !** |
+| `WEBUI_SECRET_KEY` | `tinai-secret-change-me` | ⚠️ **À changer !** |
 
----
+### 🔄 Multi-modèles supportés
 
-## Utiliser son propre modèle
+| Modèle | Repo HF | Fichier | RAM |
+|---|---|---|---|
+| **Qwen3-1.7B** (défaut) | `Qwen/Qwen3-1.7B-GGUF` | `qwen3-1.7b-q5_k_m.gguf` | ~3 GB |
+| **Phi-3 Mini** | `microsoft/Phi-3-mini-4k-instruct-gguf` | `Phi-3-mini-4k-instruct-q4.gguf` | ~3 GB |
+| **Mistral 7B** | `TheBloke/Mistral-7B-Instruct-v0.2-GGUF` | `mistral-7b-instruct-v0.2.Q4_K_M.gguf` | ~5 GB |
+| **Gemma 2B** | `bartowski/gemma-2-2b-it-GGUF` | `gemma-2-2b-it-Q5_K_M.gguf` | ~3 GB |
 
-Place ton fichier `.gguf` dans `./models/` et modifie `.env` :
-
+Exemple pour passer à Phi-3 :
 ```dotenv
-LLAMA_HF_FILE=mon-modele.gguf
+LLAMA_HF_REPO=microsoft/Phi-3-mini-4k-instruct-gguf
+LLAMA_HF_FILE=Phi-3-mini-4k-instruct-q4.gguf
 ```
 
-Le fichier sera utilisé directement, sans téléchargement.
+---
+
+## 🗂️ Utiliser son propre modèle
+
+```bash
+# Place le fichier dans ./models/
+cp ~/Downloads/mon-modele.gguf ./models/
+
+# Mets à jour .env
+echo "LLAMA_HF_FILE=mon-modele.gguf" >> .env
+
+# Redémarre
+docker compose restart
+```
 
 ---
 
-## Commandes utiles
+## 🔧 Commandes utiles / Useful commands
 
 ```bash
-# Voir les logs en temps réel
+# Logs en temps réel
 docker compose logs -f
 
 # Logs d'un service spécifique
@@ -78,16 +258,20 @@ docker compose exec tinai tail -f /var/log/tinai/llama.log
 docker compose exec tinai tail -f /var/log/tinai/webui.log
 docker compose exec tinai tail -f /var/log/tinai/openfang.log
 
-# Redémarrer un service sans recréer le conteneur
-docker compose exec tinai supervisorctl restart webui
-docker compose exec tinai supervisorctl restart llama
-docker compose exec tinai supervisorctl restart openfang
-
 # Statut des services internes
 docker compose exec tinai supervisorctl status
 
-# Arrêter
+# Redémarrer un service individuel
+docker compose exec tinai supervisorctl restart llama
+docker compose exec tinai supervisorctl restart webui
+docker compose exec tinai supervisorctl restart openfang
+
+# Monitoring ressources
+docker stats tinai
+
+# Arrêter / Relancer
 docker compose down
+docker compose up -d
 
 # Rebuild complet
 docker compose down && docker compose up --build
@@ -95,67 +279,68 @@ docker compose down && docker compose up --build
 
 ---
 
-## API llama-server (OpenAI-compatible)
+## 🏗️ Architecture
 
-```bash
-curl http://localhost:8081/v1/chat/completions \
-  -H "Authorization: Bearer sk-tinai" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "qwen3-1.7b",
-    "messages": [{"role": "user", "content": "Bonjour !"}]
-  }'
+```
+┌──────────────────────────────────────────────┐
+│  Conteneur TinAI (supervisord)               │
+│                                              │
+│  ┌─────────────────┐  ┌───────────────────┐ │
+│  │  llama-server   │  │   Open WebUI      │ │
+│  │  :8081          │◄─┤   :3000           │ │
+│  │  Qwen3-1.7B     │  │   (chat UI)       │ │
+│  └─────────────────┘  └───────────────────┘ │
+│           ▲            ┌───────────────────┐ │
+│           └────────────┤   OpenFang        │ │
+│                        │   :4200 (agents)  │ │
+│                        └───────────────────┘ │
+└──────────────────────────────────────────────┘
+        │ volumes Docker
+  ./models     → /data/models    (fichiers .gguf)
+  ./data/webui → /data/webui     (base de données WebUI)
+  ./data/fang  → /data/openfang  (agents & config)
 ```
 
 ---
 
-## Architecture
+## 📋 Configuration requise / Requirements
 
-```
-┌─────────────────────────────────────────────┐
-│  Conteneur TinAI (supervisord)              │
-│                                             │
-│  ┌──────────────┐  ┌──────────────────────┐│
-│  │ llama-server │  │     Open WebUI       ││
-│  │  :8081       │◄─┤  :3000               ││
-│  │ Qwen3-1.7B   │  │  (chat interface)    ││
-│  └──────────────┘  └──────────────────────┘│
-│         ▲           ┌──────────────────────┐│
-│         └───────────┤     OpenFang         ││
-│                     │  :4200 (agents)      ││
-│                     └──────────────────────┘│
-└─────────────────────────────────────────────┘
-       │ volumes
-  /data/models    – modèles GGUF
-  /data/webui     – base de données WebUI
-  /data/openfang  – agents & config
-```
+| | Minimum | Recommandé |
+|---|---|---|
+| **RAM** | 3 GB | 6 GB |
+| **CPU** | x86_64 / ARM64 | 4+ cœurs |
+| **Disque** | 5 GB | 10 GB |
+| **Docker** | 24.0+ | latest |
+| **OS** | Linux, macOS, Windows (WSL2) | Linux |
+
+> 🍓 Compatible Raspberry Pi 4/5 (ARM64), Apple Silicon (Rosetta 2)
 
 ---
 
-## CI / Test Report
+## 🚀 CI / Pipeline
 
-Le workflow CI s'exécute à chaque push sur `main` et génère automatiquement [`TEST-REPORT.md`](./TEST-REPORT.md).
+**3 jobs automatiques à chaque push sur `main` :**
 
-**Pipeline en 3 jobs :**
-
-1. **🔒 Audit sécurité** — ShellCheck, secrets hardcodés, `.env` absent du repo, ports via variables
-2. **🧪 Build & Test (matrice)** — Build Docker natif sur `ubuntu-latest` (amd64) et `ubuntu-24.04-arm` (arm64) en parallèle. Démarrage du conteneur, tests de disponibilité des 3 services, upload d'un artifact `TEST-REPORT-{arch}.md` par architecture
-3. **📋 Rapport consolidé** — Fusionne les deux rapports en `TEST-REPORT.md` et le committe sur `main`
-
-Le modèle GGUF n'est **pas** téléchargé en CI (trop lourd). Le rapport note `⏳ Modèle absent en CI` pour llama-server, ce qui est attendu.
-
-Les rapports détaillés par architecture sont disponibles en **artifacts** de chaque run GitHub Actions.
+1. **🔒 Audit sécurité** — ShellCheck, secrets hardcodés, `.gitignore`, ports via variables
+2. **🧪 Build & Test** — Matrice `amd64` + `arm64` en parallèle, démarrage du conteneur, tests des 3 services
+3. **📋 Rapport consolidé** — [`TEST-REPORT.md`](./TEST-REPORT.md) committé automatiquement
 
 ---
 
-## Configuration requise
+## 🤝 Contribuer / Contributing
 
-- **RAM** : 3 GB minimum, 4–6 GB recommandé
-- **CPU** : x86_64 ou ARM64 (Raspberry Pi 4/5, Apple Silicon via Rosetta)
-- **Disque** : ~5 GB (image ~3 GB + modèle ~1.4 GB)
-- **Docker** : 24.0+
+Voir [CONTRIBUTING.md](./CONTRIBUTING.md) · See [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 ---
 
-*TinAI v3 – MIT License*
+## 📄 Licence / License
+
+[MIT](./LICENSE) — MX10-AC2N
+
+---
+
+<div align="center">
+
+**Built with ❤️ using [llama.cpp](https://github.com/ggml-org/llama.cpp) · [Open WebUI](https://github.com/open-webui/open-webui) · [OpenFang](https://openfang.sh)**
+
+</div>
