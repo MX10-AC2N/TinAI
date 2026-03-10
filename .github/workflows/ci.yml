@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "Dockerfile"
+      - "Dockerfile.webui"
       - "docker-compose.yml"
       - ".env.example"
       - "supervisord.conf"
@@ -32,7 +33,6 @@ jobs:
           sudo apt-get install -y shellcheck -q
           shellcheck --severity=error --exclude=SC2034,SC2154,SC1091 \
             scripts/start-llama.sh \
-            scripts/start-webui.sh \
             scripts/start-openfang.sh \
             scripts/healthcheck.sh
           echo "✅ ShellCheck OK"
@@ -40,15 +40,13 @@ jobs:
       - name: Audit secrets hardcodés
         run: |
           FAIL=false
-          FILES="Dockerfile docker-compose.yml .env.example supervisord.conf"
-          # Patterns interdits absolus
+          FILES="Dockerfile Dockerfile.webui docker-compose.yml .env.example supervisord.conf"
           for p in 'AWS_SECRET' 'GITHUB_TOKEN\s*='; do
             if grep -riE "$p" $FILES 2>/dev/null; then
               echo "FAIL – pattern suspect : $p"
               FAIL=true
             fi
           done
-          # Valeurs hardcodées (pas via variable)
           for p in 'password\s*=\s*"[^$]' 'SECRET_KEY\s*=\s*"[^$]'; do
             if grep -riE "$p" $FILES 2>/dev/null; then
               echo "FAIL – valeur hardcodée : $p"
@@ -80,11 +78,12 @@ jobs:
           fi
           echo "✅ Ports via variables OK"
 
-      - name: Vérif Dockerfile multi-stage
+      - name: Vérif Dockerfiles multi-stage
         run: |
           STAGES=$(grep -c "^FROM" Dockerfile || true)
-          echo "Stages Docker trouvés : $STAGES"
-          [ "$STAGES" -ge 2 ] && echo "✅ Multi-stage OK" || echo "⚠️ Build mono-stage"
+          echo "Stages Dockerfile : $STAGES"
+          [ "$STAGES" -ge 2 ] && echo "✅ Dockerfile multi-stage OK" || echo "⚠️ Dockerfile mono-stage"
+          [ -f Dockerfile.webui ] && echo "✅ Dockerfile.webui présent" || { echo "FAIL – Dockerfile.webui manquant"; exit 1; }
 
       - name: Vérif LICENSE présent
         run: |
@@ -123,23 +122,30 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Cache Docker layers
+      - name: Cache Docker layers – tinai
         uses: actions/cache@v4
         with:
-          path: /tmp/buildx-cache
-          key: buildx-${{ matrix.arch }}-${{ hashFiles('Dockerfile', 'supervisord.conf', 'scripts/**') }}
-          restore-keys: buildx-${{ matrix.arch }}-
+          path: /tmp/buildx-cache-tinai
+          key: buildx-tinai-${{ matrix.arch }}-${{ hashFiles('Dockerfile', 'supervisord.conf', 'scripts/**') }}
+          restore-keys: buildx-tinai-${{ matrix.arch }}-
+
+      - name: Cache Docker layers – webui
+        uses: actions/cache@v4
+        with:
+          path: /tmp/buildx-cache-webui
+          key: buildx-webui-${{ matrix.arch }}-${{ hashFiles('Dockerfile.webui') }}
+          restore-keys: buildx-webui-${{ matrix.arch }}-
 
       - name: Setup .env CI
         run: |
           cp .env.example .env
-          # Config légère pour CI (pas de téléchargement modèle)
           echo "LLAMA_HF_FILE=qwen3-1.7b-q4_k_m.gguf" >> .env
           echo "LLAMA_THREADS=2"                        >> .env
           echo "LLAMA_CTX_SIZE=2048"                   >> .env
-          echo "MEM_LIMIT=5g"                          >> .env
-          echo "TINAI_IMAGE=tinai:v3-${{ matrix.arch }}" >> .env
-          # Clés sécurisées en CI
+          echo "MEM_LIMIT=4g"                          >> .env
+          echo "WEBUI_MEM_LIMIT=2g"                    >> .env
+          echo "TINAI_IMAGE=tinai:v4-${{ matrix.arch }}"      >> .env
+          echo "WEBUI_IMAGE=tinai-webui:v4-${{ matrix.arch }}" >> .env
           echo "TINAI_API_KEY=$(openssl rand -hex 16)"  >> .env
           echo "WEBUI_SECRET_KEY=$(openssl rand -hex 16)" >> .env
 
@@ -148,59 +154,96 @@ jobs:
           docker compose config > /dev/null
           echo "✅ Syntaxe docker-compose valide"
 
-      - name: Build image tinai:v3-${{ matrix.arch }}
+      - name: Build image tinai:v4-${{ matrix.arch }}
         run: |
           docker buildx build \
             --platform "${{ matrix.platform }}" \
-            --cache-from "type=local,src=/tmp/buildx-cache" \
-            --cache-to   "type=local,dest=/tmp/buildx-cache-new,mode=max" \
+            --cache-from "type=local,src=/tmp/buildx-cache-tinai" \
+            --cache-to   "type=local,dest=/tmp/buildx-cache-tinai-new,mode=max" \
             --load \
-            -t "tinai:v3-${{ matrix.arch }}" \
+            -t "tinai:v4-${{ matrix.arch }}" \
+            -f Dockerfile \
             .
-          rm -rf /tmp/buildx-cache
-          mv /tmp/buildx-cache-new /tmp/buildx-cache
-          echo "✅ Build ${{ matrix.arch }} OK"
+          rm -rf /tmp/buildx-cache-tinai
+          mv /tmp/buildx-cache-tinai-new /tmp/buildx-cache-tinai
+          echo "✅ Build tinai ${{ matrix.arch }} OK"
 
-      - name: Taille de l'image
+      - name: Build image tinai-webui:v4-${{ matrix.arch }}
         run: |
-          docker images "tinai:v3-${{ matrix.arch }}" --format "Taille : {{.Size}}"
+          docker buildx build \
+            --platform "${{ matrix.platform }}" \
+            --cache-from "type=local,src=/tmp/buildx-cache-webui" \
+            --cache-to   "type=local,dest=/tmp/buildx-cache-webui-new,mode=max" \
+            --load \
+            -t "tinai-webui:v4-${{ matrix.arch }}" \
+            -f Dockerfile.webui \
+            .
+          rm -rf /tmp/buildx-cache-webui
+          mv /tmp/buildx-cache-webui-new /tmp/buildx-cache-webui
+          echo "✅ Build webui ${{ matrix.arch }} OK"
 
-      - name: Vérification binaires dans l'image
+      - name: Taille des images
         run: |
-          # Vérifie que llama-server et openfang sont bien présents
-          docker run --rm --entrypoint="" "tinai:v3-${{ matrix.arch }}" \
+          docker images "tinai:v4-${{ matrix.arch }}"      --format "tinai      : {{.Size}}"
+          docker images "tinai-webui:v4-${{ matrix.arch }}" --format "tinai-webui: {{.Size}}"
+
+      - name: Vérification binaires dans l'image tinai
+        run: |
+          docker run --rm --entrypoint="" "tinai:v4-${{ matrix.arch }}" \
             sh -c "ls -lh /usr/local/bin/llama-server /usr/local/bin/openfang && echo '✅ Binaires présents'"
 
       - name: Préparation volumes
         run: mkdir -p models data/webui data/openfang
 
-      - name: Démarrage du conteneur
+      - name: Démarrage du backend (tinai seul)
         run: |
-          docker compose up -d
+          # On démarre uniquement tinai d'abord — webui dépend de son healthcheck
+          docker compose up -d tinai
           docker compose ps
 
-      - name: Attente des services
+      - name: Attente llama-server healthy
         run: |
-          # Attente parallèle : tous les services démarrent en même temps,
-          # on les attend simultanément avec une deadline commune de 120s.
+          # llama-server démarre immédiatement (sans modèle en CI = exit 1 attendu).
+          # On attend que le conteneur tinai soit "healthy" via son healthcheck,
+          # OU on constate qu'il tourne depuis 30s (llama FATAL sans modèle = connu).
+          DEADLINE=$(( $(date +%s) + 60 ))
+          echo "Attente conteneur tinai stable..."
+          while true; do
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' tinai 2>/dev/null || echo "unknown")
+            if [ "$STATUS" = "healthy" ]; then
+              echo "✅ tinai healthy"
+              break
+            fi
+            # En CI sans modèle, llama crashe mais openfang tourne → conteneur jamais healthy.
+            # On attend simplement 30s que supervisord ait fini de lancer les services.
+            if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+              echo "⏰ Timeout healthcheck tinai (attendu en CI sans modèle)"
+              break
+            fi
+            sleep 5
+          done
+
+      - name: Démarrage webui
+        run: |
+          docker compose up -d webui
+          docker compose ps
+
+      - name: Attente Open WebUI
+        run: |
+          # Open WebUI démarre indépendamment de llama-server dans son propre conteneur.
+          # Pas de boucle d'attente interne → port :8080 disponible en ~20-40s.
           DEADLINE=$(( $(date +%s) + 120 ))
-
-          wait_for() {
-            local name="$1" url="$2"
-            while ! curl -sSf --max-time 5 "$url" > /dev/null 2>&1; do
-              if [ "$(date +%s)" -ge "$DEADLINE" ]; then
-                echo "⏰ Timeout pour $name"
-                return 1
-              fi
-              sleep 5
-            done
-            echo "✅ $name OK"
-          }
-
-          wait_for "Open WebUI 3000"   "http://127.0.0.1:3000/"       &
-          wait_for "OpenFang 4200"     "http://127.0.0.1:4200/"       &
-          wait_for "llama-server 8081" "http://127.0.0.1:8081/health" &
-          wait || true
+          echo "Attente Open WebUI :3000..."
+          while ! curl -sSf --max-time 5 "http://127.0.0.1:3000/" > /dev/null 2>&1; do
+            if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+              echo "⏰ Timeout Open WebUI"
+              break
+            fi
+            sleep 5
+          done
+          curl -sSf --max-time 5 "http://127.0.0.1:3000/" > /dev/null 2>&1 \
+            && echo "✅ Open WebUI :3000 OK" \
+            || echo "⚠️ Open WebUI non disponible"
 
       - name: Tests fonctionnels
         id: tests
@@ -219,6 +262,7 @@ jobs:
             fi
           }
 
+          # Open WebUI est le test critique (required=true)
           check_url "Open WebUI :3000"  "http://127.0.0.1:3000/" "true"
           check_url "OpenFang :4200"    "http://127.0.0.1:4200/" "false"
 
@@ -231,23 +275,19 @@ jobs:
             echo "⏳ llama-server – modèle absent en CI (attendu)"
           fi
 
-          # Test supervisorctl
+          # Test supervisorctl sur le conteneur backend
           SUPERVISOR=$(docker compose exec -T tinai supervisorctl status 2>&1 || echo "N/A")
-          echo "--- supervisorctl ---"
+          echo "--- supervisorctl (tinai) ---"
           echo "$SUPERVISOR"
-
-          # Test réponse healthcheck
-          HEALTH=$(docker compose exec -T tinai /usr/local/bin/healthcheck.sh 2>&1; echo "exit:$?")
-          echo "--- healthcheck ---"
-          echo "$HEALTH"
 
           # Génération du rapport
           CONTAINERS=$(docker compose ps 2>&1)
-          IMG_SIZE=$(docker images "tinai:v3-${{ matrix.arch }}" --format "{{.Size}}")
+          IMG_SIZE_TINAI=$(docker images "tinai:v4-${{ matrix.arch }}" --format "{{.Size}}")
+          IMG_SIZE_WEBUI=$(docker images "tinai-webui:v4-${{ matrix.arch }}" --format "{{.Size}}")
           BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M UTC")
           LOG_LLAMA=$(docker compose exec -T tinai tail -n 20 /var/log/tinai/llama.log 2>/dev/null || echo "N/A")
-          LOG_WEBUI=$(docker compose exec -T tinai tail -n 10 /var/log/tinai/webui.log 2>/dev/null || echo "N/A")
-          LOG_FANG=$(docker compose exec -T tinai tail -n 10 /var/log/tinai/openfang.log 2>/dev/null || echo "N/A")
+          LOG_FANG=$(docker compose exec -T tinai  tail -n 10 /var/log/tinai/openfang.log 2>/dev/null || echo "N/A")
+          LOG_WEBUI=$(docker compose logs --tail=10 webui 2>&1 || echo "N/A")
 
           REPORT="TEST-REPORT-${ARCH}.md"
           {
@@ -261,15 +301,16 @@ jobs:
             printf '**Commit  :** `%s`\n' "${{ github.sha }}"
             printf '**Branch  :** `%s`\n' "${{ github.ref_name }}"
             printf '**Arch    :** `%s` (`%s`)\n' "$ARCH" "${{ matrix.platform }}"
-            printf '**Image   :** `tinai:v3-%s` — %s\n\n' "$ARCH" "$IMG_SIZE"
-            printf -- '---\n\n## État du conteneur\n\n```\n%s\n```\n\n' "$CONTAINERS"
-            printf '## Services supervisord\n\n```\n%s\n```\n\n' "$SUPERVISOR"
+            printf '**tinai   :** `tinai:v4-%s` — %s\n' "$ARCH" "$IMG_SIZE_TINAI"
+            printf '**webui   :** `tinai-webui:v4-%s` — %s\n\n' "$ARCH" "$IMG_SIZE_WEBUI"
+            printf -- '---\n\n## État des conteneurs\n\n```\n%s\n```\n\n' "$CONTAINERS"
+            printf '## Services supervisord (tinai)\n\n```\n%s\n```\n\n' "$SUPERVISOR"
             printf '## Logs llama-server\n\n```\n%s\n```\n\n' "$LOG_LLAMA"
-            printf '## Logs Open WebUI\n\n```\n%s\n```\n\n' "$LOG_WEBUI"
             printf '## Logs OpenFang\n\n```\n%s\n```\n\n' "$LOG_FANG"
+            printf '## Logs Open WebUI\n\n```\n%s\n```\n\n' "$LOG_WEBUI"
             printf -- '---\n\n## Notes\n'
             printf '- llama-server : modèle non téléchargé en CI (normal)\n'
-            printf '- Open WebUI   : interface disponible sans modèle\n'
+            printf '- Open WebUI   : conteneur dédié, démarre sans attendre llama\n'
             printf '- OpenFang     : daemon Rust démarré\n'
           } > "$REPORT"
           cat "$REPORT"
