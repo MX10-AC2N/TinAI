@@ -1,0 +1,58 @@
+# ══════════════════════════════════════════════════════════════════
+#  TinAI – Image Open WebUI
+#  Conteneur dédié : interface web uniquement
+#  Connexion au backend llama-server via réseau Docker (tinai-net)
+#  Cibles : linux/amd64 · linux/arm64
+# ══════════════════════════════════════════════════════════════════
+
+# Force PyTorch CPU-only AVANT open-webui pour éviter les ~7 Go de
+# binaires CUDA (nvidia-cuda-*, cuda-bindings…) tirés automatiquement
+# par sentence-transformers sur amd64. L'inférence GPU reste gérée
+# par llama-server dans le conteneur tinai.
+FROM python:3.11-slim-bookworm
+
+ARG TARGETPLATFORM
+
+LABEL org.opencontainers.image.title="TinAI WebUI"
+LABEL org.opencontainers.image.description="Open WebUI – frontend for TinAI"
+LABEL org.opencontainers.image.source="https://github.com/MX10-AC2N/TinAI"
+LABEL org.opencontainers.image.architecture="${TARGETPLATFORM}"
+LABEL org.opencontainers.image.licenses="MIT"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+        torch --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir \
+        open-webui \
+        huggingface_hub \
+    && pip cache purge \
+    && find /usr/local/lib/python3.11 -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true \
+    && find /usr/local/lib/python3.11 -type d -name "tests"       -exec rm -rf {} + 2>/dev/null || true \
+    && find /usr/local/lib/python3.11 -name "*.pyc"               -delete 2>/dev/null || true
+
+RUN mkdir -p /app/backend/data
+
+# ── Variables d'environnement ─────────────────────────────────────
+# OPENAI_API_BASE_URL pointe vers le service tinai sur tinai-net
+ENV OPENAI_API_BASE_URL=http://tinai:8081/v1 \
+    OPENAI_API_KEY=sk-tinai \
+    WEBUI_SECRET_KEY=tinai-secret-change-me \
+    DATA_DIR=/app/backend/data \
+    PORT=8080 \
+    HOST=0.0.0.0 \
+    WEBUI_AUTH=True \
+    SCARF_NO_ANALYTICS=true \
+    DO_NOT_TRACK=true \
+    ANONYMIZED_TELEMETRY=false
+
+VOLUME ["/app/backend/data"]
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -sf http://localhost:8080/ > /dev/null || exit 1
+
+CMD ["open-webui", "serve", "--host", "0.0.0.0", "--port", "8080"]
