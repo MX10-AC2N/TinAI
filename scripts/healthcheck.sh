@@ -1,11 +1,12 @@
 #!/bin/bash
 # ── Healthcheck TinAI (conteneur backend) ────────────────────────
-# Vérifie llama-server uniquement.
-# Open WebUI a son propre healthcheck dans son conteneur.
-LLAMA_PORT="${LLAMA_PORT:-8081}"
-API_KEY="${TINAI_API_KEY:-sk-tinai}"
+# Stratégie : openfang (toujours up) rend le conteneur healthy,
+# ce qui permet à Open WebUI de démarrer même sans modèle GGUF.
+# llama-server est intentionnellement exclu : il est FATAL en CI
+# (pas de modèle), ce qui bloquerait le depends_on du service webui.
+OPENFANG_PORT="${OPENFANG_PORT:-4200}"
 
-curl -sf "http://localhost:${LLAMA_PORT}/health" \
-    -H "Authorization: Bearer ${API_KEY}" >/dev/null 2>&1 || exit 1
+# openfang doit répondre (obligatoire)
+curl -sf "http://localhost:${OPENFANG_PORT}/" >/dev/null 2>&1 || exit 1
 
 exit 0
