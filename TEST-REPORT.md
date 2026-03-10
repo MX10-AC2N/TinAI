@@ -1,8 +1,8 @@
 # TinAI – Test Report
 
-**Date   :** 2026-03-10 15:02 UTC
-**Run    :** [#40](https://github.com/MX10-AC2N/TinAI/actions/runs/22908037423)
-**Commit :** `db43716ee158e8597940619239664a8b28d8e83d`
+**Date   :** 2026-03-10 15:31 UTC
+**Run    :** [#45](https://github.com/MX10-AC2N/TinAI/actions/runs/22910315410)
+**Commit :** `93f71fdc74075016aec75c3215380d73ff2cd323`
 **Branch :** `main`
 
 ---
@@ -12,7 +12,6 @@
 
 ## arm64
 
-> Rapport non disponible pour arm64
 
 ---
 
