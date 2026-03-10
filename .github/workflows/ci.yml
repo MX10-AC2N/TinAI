@@ -254,12 +254,12 @@ jobs:
             printf '**Branch  :** `%s`\n' "${{ github.ref_name }}"
             printf '**Arch    :** `%s` (`%s`)\n' "$ARCH" "${{ matrix.platform }}"
             printf '**Image   :** `tinai:v3-%s` — %s\n\n' "$ARCH" "$IMG_SIZE"
-            printf '---\n\n## État du conteneur\n\n```\n%s\n```\n\n' "$CONTAINERS"
+            printf -- '---\n\n## État du conteneur\n\n```\n%s\n```\n\n' "$CONTAINERS"
             printf '## Services supervisord\n\n```\n%s\n```\n\n' "$SUPERVISOR"
             printf '## Logs llama-server\n\n```\n%s\n```\n\n' "$LOG_LLAMA"
             printf '## Logs Open WebUI\n\n```\n%s\n```\n\n' "$LOG_WEBUI"
             printf '## Logs OpenFang\n\n```\n%s\n```\n\n' "$LOG_FANG"
-            printf '---\n\n## Notes\n'
+            printf -- '---\n\n## Notes\n'
             printf '- llama-server : modèle non téléchargé en CI (normal)\n'
             printf '- Open WebUI   : interface disponible sans modèle\n'
             printf '- OpenFang     : daemon Rust démarré\n'
@@ -328,7 +328,7 @@ jobs:
               "${{ github.run_id }}"
             printf '**Commit :** `%s`\n' "${{ github.sha }}"
             printf '**Branch :** `%s`\n\n' "${{ github.ref_name }}"
-            printf '---\n\n'
+            printf -- '---\n\n'
             for arch in amd64 arm64; do
               printf '## %s\n\n' "$arch"
               if [ -f "reports/TEST-REPORT-${arch}.md" ]; then
@@ -339,7 +339,7 @@ jobs:
               fi
               printf '\n'
             done
-            printf '---\n\n'
+            printf -- '---\n\n'
             printf '*Rapports détaillés disponibles en artifacts du workflow.*\n'
           } > TEST-REPORT.md
           cat TEST-REPORT.md
