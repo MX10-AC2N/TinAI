@@ -1,7 +1,7 @@
 # ══════════════════════════════════════════════════════════════════
-#  TinAI – Image unique multi-architecture
+#  TinAI – Image principale (llama.cpp + OpenFang)
 #  Cibles : linux/amd64 · linux/arm64
-#  Contenu : llama.cpp + Open WebUI + OpenFang (Rust binary)
+#  Open WebUI est désormais dans son propre conteneur (Dockerfile.webui)
 #  Modèle  : configurable via LLAMA_HF_* (téléchargé au 1er run)
 # ══════════════════════════════════════════════════════════════════
 ARG TARGETARCH
@@ -63,39 +63,23 @@ RUN set -eux; \
     && strip /openfang-bin
 
 # ══════════════════════════════════════════════════════════════════
-#  Étape 3 : Image finale (Python 3.11 — requis par Open WebUI)
+#  Étape 3 : Image finale – runtime minimal (pas de Python/pip)
 # ══════════════════════════════════════════════════════════════════
-FROM python:3.11-slim-bookworm
+FROM debian:bookworm-slim
 
 ARG TARGETARCH
 ARG TARGETPLATFORM
 
 LABEL org.opencontainers.image.title="TinAI"
-LABEL org.opencontainers.image.description="llama.cpp + Open WebUI + OpenFang – offline AI stack"
+LABEL org.opencontainers.image.description="llama.cpp + OpenFang – offline AI backend"
 LABEL org.opencontainers.image.source="https://github.com/MX10-AC2N/TinAI"
 LABEL org.opencontainers.image.architecture="${TARGETPLATFORM}"
 LABEL org.opencontainers.image.licenses="MIT"
 
-# Runtime : curl (healthchecks), supervisor, wget (fallback download)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates libssl3 \
     supervisor procps wget \
     && rm -rf /var/lib/apt/lists/*
-
-# ── Open WebUI + huggingface_hub ──────────────────────────────────
-# Force PyTorch CPU-only pour éviter les ~7 Go de binaires CUDA
-# (nvidia-cuda-*, cuda-bindings, etc.) installés automatiquement
-# par sentence-transformers sur amd64.
-# La stack llama.cpp gère l'inférence GPU via llama-server.
-RUN pip install --no-cache-dir \
-    torch --index-url https://download.pytorch.org/whl/cpu \
-    && pip install --no-cache-dir \
-    open-webui \
-    huggingface_hub \
-    && pip cache purge \
-    && find /usr/local/lib/python3.11 -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true \
-    && find /usr/local/lib/python3.11 -type d -name "tests"       -exec rm -rf {} + 2>/dev/null || true \
-    && find /usr/local/lib/python3.11 -name "*.pyc"               -delete 2>/dev/null || true
 
 # ── Binaires compilés ─────────────────────────────────────────────
 COPY --from=llama-builder    /src/build/bin/llama-server /usr/local/bin/llama-server
@@ -106,20 +90,17 @@ RUN chmod +x /usr/local/bin/llama-server /usr/local/bin/openfang
 # ── Répertoires de données ────────────────────────────────────────
 RUN mkdir -p \
     /data/models \
-    /app/backend/data \
     /root/.openfang \
     /var/log/tinai
 
 # ── Scripts & config ──────────────────────────────────────────────
 COPY scripts/start-llama.sh    /usr/local/bin/start-llama.sh
-COPY scripts/start-webui.sh    /usr/local/bin/start-webui.sh
 COPY scripts/start-openfang.sh /usr/local/bin/start-openfang.sh
 COPY scripts/healthcheck.sh    /usr/local/bin/healthcheck.sh
 COPY supervisord.conf          /etc/supervisor/conf.d/tinai.conf
 
 RUN chmod +x \
     /usr/local/bin/start-llama.sh \
-    /usr/local/bin/start-webui.sh \
     /usr/local/bin/start-openfang.sh \
     /usr/local/bin/healthcheck.sh
 
@@ -131,19 +112,16 @@ ENV LLAMA_MODEL_PATH=/data/models/model.gguf \
     LLAMA_THREADS=4 \
     LLAMA_GPU_LAYERS=0 \
     LLAMA_PORT=8081 \
-    WEBUI_PORT=3000 \
-    WEBUI_SECRET_KEY=tinai-secret-change-me \
-    WEBUI_AUTH=True \
     OPENFANG_PORT=4200 \
     TINAI_API_KEY=sk-tinai \
     DATA_DIR=/data \
     HOME=/root
 
-VOLUME ["/data/models", "/app/backend/data", "/root/.openfang"]
+VOLUME ["/data/models", "/root/.openfang"]
 
-EXPOSE 3000 4200 8081
+EXPOSE 4200 8081
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD /usr/local/bin/healthcheck.sh
 
 ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/tinai.conf"]
