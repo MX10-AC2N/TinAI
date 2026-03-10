@@ -87,17 +87,17 @@ else
     echo "[openfang] ✓ config.toml existant trouvé"
 fi
 
-# ── Attente llama-server ──────────────────────────────────────────
-echo "[openfang] Attente de llama-server sur :${LLAMA_PORT}..."
-for i in $(seq 1 60); do
-    if curl -sf "http://localhost:${LLAMA_PORT}/health" \
-            -H "Authorization: Bearer ${API_KEY}" >/dev/null 2>&1; then
-        echo "[openfang] ✓ llama-server disponible (${i}x5s)"
-        break
-    fi
-    echo "[openfang] ... attente (${i}/60)"
-    sleep 5
-done
+# ── Vérification llama-server (non-bloquante) ────────────────────
+# On ne bloque PAS sur llama-server : openfang démarre indépendamment
+# et se connecte au LLM quand il en a besoin (lazy connection).
+# En production, llama-server sera disponible avant qu'un agent soit
+# invoqué. En CI (pas de modèle), openfang tourne sans LLM local.
+if curl -sf --max-time 2 "http://localhost:${LLAMA_PORT}/health" \
+        -H "Authorization: Bearer ${API_KEY}" >/dev/null 2>&1; then
+    echo "[openfang] ✓ llama-server déjà disponible"
+else
+    echo "[openfang] ℹ llama-server non disponible — démarrage sans LLM local (normal en CI)"
+fi
 
 # ── Init OpenFang si premier démarrage ────────────────────────────
 if [ ! -f "${OPENFANG_DATA}/.initialized" ]; then
