@@ -1,12 +1,14 @@
 #!/bin/bash
 # ── Healthcheck TinAI (conteneur backend) ────────────────────────
-# Stratégie : openfang (toujours up) rend le conteneur healthy,
-# ce qui permet à Open WebUI de démarrer même sans modèle GGUF.
-# llama-server est intentionnellement exclu : il est FATAL en CI
-# (pas de modèle), ce qui bloquerait le depends_on du service webui.
+# Teste l'endpoint public d'openfang : GET /api/health → {"version":"x.y.z"}
+# Source : https://github.com/RightNow-AI/openfang (CLAUDE.md + issue #44)
+#
+# Pourquoi openfang et pas llama-server ?
+#   llama-server est FATAL en CI (pas de modèle GGUF) → le conteneur
+#   resterait unhealthy pour toujours et bloquerait le démarrage de webui.
+#   openfang démarre toujours (~16s) et expose /api/health sans auth.
 OPENFANG_PORT="${OPENFANG_PORT:-4200}"
 
-# openfang doit répondre (obligatoire)
-curl -sf "http://localhost:${OPENFANG_PORT}/" >/dev/null 2>&1 || exit 1
+curl -sf "http://localhost:${OPENFANG_PORT}/api/health" >/dev/null 2>&1 || exit 1
 
 exit 0
