@@ -36,6 +36,9 @@ if [ ! -f "${MODEL_PATH}" ]; then
 
     mkdir -p "$(dirname "${MODEL_PATH}")"
     DOWNLOAD_OK=0
+    # HuggingFace URL avec ?download=true pour forcer le téléchargement direct
+    HF_URL="https://huggingface.co/${HF_REPO}/resolve/main/${HF_FILE}?download=true"
+    HF_UA="TinAI/4.0 (llama.cpp model downloader)"
 
     # Tentative 1 : huggingface_hub (Python)
     if command -v python3 >/dev/null 2>&1; then
@@ -62,31 +65,31 @@ except Exception as e:
 EOF
     fi
 
-    # Tentative 2 : wget
-    if [ "${DOWNLOAD_OK}" -eq 0 ] && command -v wget >/dev/null 2>&1; then
-        echo "[llama] Fallback wget..."
-        HF_URL="https://huggingface.co/${HF_REPO}/resolve/main/${HF_FILE}"
-        if wget --retry-connrefused --tries=3 -q --show-progress \
-               -O "${MODEL_PATH}.tmp" "${HF_URL}"; then
-            mv "${MODEL_PATH}.tmp" "${MODEL_PATH}"
-            DOWNLOAD_OK=1
-        else
-            rm -f "${MODEL_PATH}.tmp"
-            echo "[llama] ✗ wget échoué"
-        fi
-    fi
-
-    # Tentative 3 : curl
+    # Tentative 2 : curl (avec User-Agent + ?download=true)
     if [ "${DOWNLOAD_OK}" -eq 0 ] && command -v curl >/dev/null 2>&1; then
-        echo "[llama] Fallback curl..."
-        HF_URL="https://huggingface.co/${HF_REPO}/resolve/main/${HF_FILE}"
-        if curl --retry 3 -fL --progress-bar \
+        echo "[llama] Tentative curl..."
+        if curl --retry 3 --retry-delay 5 -fL --progress-bar \
+                -A "${HF_UA}" \
                 -o "${MODEL_PATH}.tmp" "${HF_URL}"; then
             mv "${MODEL_PATH}.tmp" "${MODEL_PATH}"
             DOWNLOAD_OK=1
         else
             rm -f "${MODEL_PATH}.tmp"
             echo "[llama] ✗ curl échoué"
+        fi
+    fi
+
+    # Tentative 3 : wget (avec User-Agent + ?download=true)
+    if [ "${DOWNLOAD_OK}" -eq 0 ] && command -v wget >/dev/null 2>&1; then
+        echo "[llama] Tentative wget..."
+        if wget --retry-connrefused --tries=3 -q --show-progress \
+               -U "${HF_UA}" \
+               -O "${MODEL_PATH}.tmp" "${HF_URL}"; then
+            mv "${MODEL_PATH}.tmp" "${MODEL_PATH}"
+            DOWNLOAD_OK=1
+        else
+            rm -f "${MODEL_PATH}.tmp"
+            echo "[llama] ✗ wget échoué"
         fi
     fi
 
