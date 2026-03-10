@@ -2,13 +2,13 @@
 
 # 🧠 TinAI
 
-**Local AI stack — 100% offline, CPU-only, one Docker container.**  
-**Stack IA locale — 100 % offline, CPU only, un seul conteneur Docker.**
+**Local AI stack — 100% offline, CPU-only, two focused Docker containers.**  
+**Stack IA locale — 100 % offline, CPU only, deux conteneurs Docker dédiés.**
 
 [![CI amd64](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml)
 [![CI arm64](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml/badge.svg?branch=main&label=arm64)](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-orange.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-3.1.0-blue)](https://github.com/MX10-AC2N/TinAI/releases)
+[![Version](https://img.shields.io/badge/version-4.0.0-blue)](https://github.com/MX10-AC2N/TinAI/releases)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io-2496ED?logo=docker)](https://ghcr.io/MX10-AC2N/tinai)
 [![OpenFang](https://img.shields.io/badge/OpenFang-pre--1.0-brightgreen)](https://openfang.sh)
 [![llama.cpp](https://img.shields.io/badge/llama.cpp-latest-orange)](https://github.com/ggml-org/llama.cpp)
@@ -222,7 +222,8 @@ Installe l'extension **Continue** ([marketplace](https://marketplace.visualstudi
 | `LLAMA_CTX_SIZE` | `8192` | Contexte en tokens |
 | `LLAMA_THREADS` | `4` | Threads CPU (= cœurs physiques) |
 | `LLAMA_GPU_LAYERS` | `0` | `0` = CPU only, `-1` = tout GPU |
-| `MEM_LIMIT` | `6g` | RAM max du conteneur |
+| `MEM_LIMIT` | `6g` | RAM max du conteneur **tinai** (backend) |
+| `WEBUI_MEM_LIMIT` | `3g` | RAM max du conteneur **webui** |
 | `TINAI_API_KEY` | `sk-tinai` | ⚠️ **À changer !** |
 | `WEBUI_SECRET_KEY` | `tinai-secret-change-me` | ⚠️ **À changer !** |
 
@@ -252,8 +253,8 @@ cp ~/Downloads/mon-modele.gguf ./models/
 # Mets à jour .env
 echo "LLAMA_HF_FILE=mon-modele.gguf" >> .env
 
-# Redémarre
-docker compose restart
+# Redémarre le backend
+docker compose restart tinai
 ```
 
 ---
@@ -261,24 +262,30 @@ docker compose restart
 ## 🔧 Commandes utiles / Useful commands
 
 ```bash
-# Logs en temps réel
+# Logs en temps réel (tous les conteneurs)
 docker compose logs -f
 
-# Logs d'un service spécifique
+# Logs par conteneur
+docker compose logs -f tinai
+docker compose logs -f webui
+
+# Logs des services internes (backend)
 docker compose exec tinai tail -f /var/log/tinai/llama.log
-docker compose exec tinai tail -f /var/log/tinai/webui.log
 docker compose exec tinai tail -f /var/log/tinai/openfang.log
 
-# Statut des services internes
+# Statut des services internes (supervisord)
 docker compose exec tinai supervisorctl status
 
 # Redémarrer un service individuel
 docker compose exec tinai supervisorctl restart llama
-docker compose exec tinai supervisorctl restart webui
 docker compose exec tinai supervisorctl restart openfang
 
+# Redémarrer un conteneur entier
+docker compose restart tinai
+docker compose restart webui
+
 # Monitoring ressources
-docker stats tinai
+docker stats tinai tinai-webui
 
 # Arrêter / Relancer
 docker compose down
@@ -293,26 +300,31 @@ docker compose down && docker compose up --build
 ## 🏗️ Architecture
 
 ```
-┌──────────────────────────────────────────────────┐
-│  Conteneur TinAI (supervisord)                   │
-│                                                  │
-│  ┌──────────────────┐  ┌────────────────────┐   │
-│  │  llama-server    │  │   Open WebUI       │   │
-│  │  :8081           │◄─┤   :3000            │   │
-│  │  ~32MB · Rust    │  │   Python 3.11      │   │
-│  └──────────────────┘  └────────────────────┘   │
-│           ▲              ┌────────────────────┐  │
-│           └──────────────┤   OpenFang         │  │
-│                          │   :4200 (dashboard)│  │
-│                          │   ~32MB · Rust     │  │
-│                          │   7 Hands · 40 ch. │  │
-│                          └────────────────────┘  │
-└──────────────────────────────────────────────────┘
-          │ volumes Docker
-  ./models          → /data/models      (fichiers .gguf)
-  ./data/webui      → /app/backend/data (BDD Open WebUI)
-  ./data/openfang   → /root/.openfang   (config.toml + agents)
+┌─────────────────────────────────┐   ┌──────────────────────────┐
+│  Conteneur  tinai               │   │  Conteneur  tinai-webui  │
+│  (Dockerfile)                   │   │  (Dockerfile.webui)      │
+│                                 │   │                          │
+│  ┌─────────────────────────┐   │   │  ┌────────────────────┐  │
+│  │  llama-server  :8081    │◄──┼───┼──┤  Open WebUI  :8080 │  │
+│  │  ~32 MB · C/C++         │   │   │  │  Python 3.11       │  │
+│  └─────────────────────────┘   │   │  └────────────────────┘  │
+│  ┌─────────────────────────┐   │   └──────────────────────────┘
+│  │  OpenFang  :4200        │   │           port 3000 (host)
+│  │  ~32 MB · Rust          │   │
+│  │  7 Hands · 40 canaux    │   │
+│  └─────────────────────────┘   │
+└─────────────────────────────────┘
+         ports 4200, 8081 (host)
+              tinai-net (bridge)
+
+Volumes :
+  ./models          → tinai:/data/models           (fichiers .gguf)
+  ./data/openfang   → tinai:/root/.openfang         (config + agents)
+  ./data/webui      → tinai-webui:/app/backend/data (BDD Open WebUI)
 ```
+
+**Pourquoi deux conteneurs ?**  
+Open WebUI est une application Python lourde (~2-3 GB d'image). La séparer du backend `tinai` (Debian slim + 2 binaires) permet à chaque conteneur de démarrer, redémarrer et scaler indépendamment, et évite que le temps de démarrage de l'un ne bloque l'autre.
 
 ---
 
@@ -320,7 +332,7 @@ docker compose down && docker compose up --build
 
 | | Minimum | Recommandé |
 |---|---|---|
-| **RAM** | 3 GB | 6 GB |
+| **RAM** | 4 GB | 8 GB |
 | **CPU** | x86_64 / ARM64 | 4+ cœurs |
 | **Disque** | 5 GB | 10 GB |
 | **Docker** | 24.0+ | latest |
@@ -334,8 +346,8 @@ docker compose down && docker compose up --build
 
 **3 jobs automatiques à chaque push sur `main` :**
 
-1. **🔒 Audit sécurité** — ShellCheck, secrets hardcodés, `.gitignore`, ports via variables
-2. **🧪 Build & Test** — Matrice `amd64` + `arm64` en parallèle, démarrage du conteneur, tests des 3 services
+1. **🔒 Audit sécurité** — ShellCheck, secrets hardcodés, `.gitignore`, ports via variables, présence de `Dockerfile.webui`
+2. **🧪 Build & Test** — Matrice `amd64` + `arm64` en parallèle, build des **deux images**, démarrage séquencé (`tinai` puis `webui`), tests des 3 services
 3. **📋 Rapport consolidé** — [`TEST-REPORT.md`](./TEST-REPORT.md) committé automatiquement
 
 ---
