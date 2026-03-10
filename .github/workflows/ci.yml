@@ -181,18 +181,26 @@ jobs:
 
       - name: Attente des services
         run: |
+          # Attente parallèle : tous les services démarrent en même temps,
+          # on les attend simultanément avec une deadline commune de 120s.
+          DEADLINE=$(( $(date +%s) + 120 ))
+
           wait_for() {
-            local name="$1" url="$2" max="${3:-90}" i=0
-            echo "Attente $name ..."
+            local name="$1" url="$2"
             while ! curl -sSf --max-time 5 "$url" > /dev/null 2>&1; do
-              sleep 5; i=$((i + 5))
-              [ "$i" -ge "$max" ] && { echo "⏰ Timeout ${max}s pour $name"; return 1; }
+              if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+                echo "⏰ Timeout pour $name"
+                return 1
+              fi
+              sleep 5
             done
-            echo "✅ $name OK en ${i}s"
+            echo "✅ $name OK"
           }
-          wait_for "Open WebUI 3000"   "http://127.0.0.1:3000/"       90 || true
-          wait_for "OpenFang 4200"     "http://127.0.0.1:4200/"      120 || true
-          wait_for "llama-server 8081" "http://127.0.0.1:8081/health" 30 || true
+
+          wait_for "Open WebUI 3000"   "http://127.0.0.1:3000/"       &
+          wait_for "OpenFang 4200"     "http://127.0.0.1:4200/"       &
+          wait_for "llama-server 8081" "http://127.0.0.1:8081/health" &
+          wait || true
 
       - name: Tests fonctionnels
         id: tests
