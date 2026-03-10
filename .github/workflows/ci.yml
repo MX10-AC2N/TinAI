@@ -201,25 +201,18 @@ jobs:
           docker compose up -d tinai
           docker compose ps
 
-      - name: Attente llama-server healthy
+      - name: Attente tinai healthy
         run: |
-          # llama-server démarre immédiatement (sans modèle en CI = exit 1 attendu).
-          # On attend que le conteneur tinai soit "healthy" via son healthcheck,
-          # OU on constate qu'il tourne depuis 30s (llama FATAL sans modèle = connu).
+          # healthcheck.sh teste openfang (startsecs=15 → RUNNING à ~16s).
+          # start_period=25s → Docker évalue le healthcheck à partir de t+25s.
+          # Deadline CI=90s → largement suffisant.
           DEADLINE=$(( $(date +%s) + 90 ))
           echo "Attente conteneur tinai healthy..."
           while true; do
             STATUS=$(docker inspect --format='{{.State.Health.Status}}' tinai 2>/dev/null || echo "unknown")
-            if [ "$STATUS" = "healthy" ]; then
-              echo "✅ tinai healthy"
-              break
-            fi
-            # En CI sans modèle, llama crashe mais openfang tourne → conteneur jamais healthy.
-            # On attend simplement 30s que supervisord ait fini de lancer les services.
-            if [ "$(date +%s)" -ge "$DEADLINE" ]; then
-              echo "⏰ Timeout healthcheck tinai (attendu en CI sans modèle)"
-              break
-            fi
+            echo "  → $STATUS"
+            [ "$STATUS" = "healthy" ] && echo "✅ tinai healthy" && break
+            [ "$(date +%s)" -ge "$DEADLINE" ] && echo "⏰ Timeout — statut final : $STATUS" && exit 1
             sleep 5
           done
 
