@@ -1,34 +1,33 @@
 # ══════════════════════════════════════════════════════════════════
-#  TinAI v3 – docker-compose.yml
-#  Un seul conteneur : llama.cpp + Open WebUI + OpenFang
-#  Multi-modèle : configure LLAMA_HF_* dans .env
+#  TinAI v4 – docker-compose.yml
+#  Deux conteneurs séparés :
+#    tinai   → llama.cpp + OpenFang  (Dockerfile)
+#    webui   → Open WebUI            (Dockerfile.webui)
 # ══════════════════════════════════════════════════════════════════
 
 services:
 
-  # ── Service principal ─────────────────────────────────────────
+  # ── Backend : llama-server + OpenFang ─────────────────────────
   tinai:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ${TINAI_IMAGE:-tinai:v3}
+    image: ${TINAI_IMAGE:-tinai:v4}
 
     container_name: tinai
     restart: unless-stopped
 
     ports:
-      - "${PORT_WEBUI:-3000}:3000"     # Open WebUI  → http://localhost:3000
       - "${PORT_OPENFANG:-4200}:4200"  # OpenFang    → http://localhost:4200
       - "${PORT_LLAMA:-8081}:8081"     # llama-server API (OpenAI-compatible)
 
     volumes:
-      - ${MODELS_DIR:-./models}:/data/models              # Modèles GGUF
-      - ${WEBUI_DATA_DIR:-./data/webui}:/app/backend/data       # BDD WebUI
-      - ${OPENFANG_DATA_DIR:-./data/openfang}:/root/.openfang  # Config & agents (→ /root/.openfang)
-      - tinai-logs:/var/log/tinai                         # Logs partagés avec monitor
+      - ${MODELS_DIR:-./models}:/data/models               # Modèles GGUF
+      - ${OPENFANG_DATA_DIR:-./data/openfang}:/root/.openfang  # Config & agents
+      - tinai-logs:/var/log/tinai
 
     environment:
-      # ── Modèle (multi-modèle via .env) ──────────────────────
+      # ── Modèle ──────────────────────────────────────────────
       LLAMA_HF_REPO:    ${LLAMA_HF_REPO:-Qwen/Qwen3-1.7B-GGUF}
       LLAMA_HF_FILE:    ${LLAMA_HF_FILE:-qwen3-1.7b-q5_k_m.gguf}
       LLAMA_MODEL_PATH: /data/models/${LLAMA_HF_FILE:-qwen3-1.7b-q5_k_m.gguf}
@@ -40,12 +39,10 @@ services:
       LLAMA_PORT:       8081
 
       # ── Ports internes ───────────────────────────────────────
-      WEBUI_PORT:       3000
       OPENFANG_PORT:    4200
 
       # ── Sécurité ─────────────────────────────────────────────
       TINAI_API_KEY:    ${TINAI_API_KEY:-sk-tinai}
-      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:-tinai-secret-change-me}
 
       # ── OpenFang canaux (optionnel) ──────────────────────────
       TELEGRAM_BOT_TOKEN:  ${TELEGRAM_BOT_TOKEN:-}
@@ -60,10 +57,10 @@ services:
     mem_reservation: 2g
 
     healthcheck:
-      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
+      test: ["/usr/local/bin/healthcheck.sh"]
       interval: 30s
       timeout: 10s
-      start_period: 120s
+      start_period: 60s
       retries: 3
 
     logging:
@@ -75,10 +72,57 @@ services:
     networks:
       - tinai-net
 
-  # ── Monitoring léger (sidecar) ───────────────────────────────
-  # Expose les métriques système basiques via un endpoint HTTP simple.
-  # Accessible sur http://localhost:9090/metrics (format texte).
-  # Pour désactiver : commente ce bloc ou ajoute MONITORING=false dans .env.
+  # ── Frontend : Open WebUI ──────────────────────────────────────
+  webui:
+    build:
+      context: .
+      dockerfile: Dockerfile.webui
+    image: ${WEBUI_IMAGE:-tinai-webui:v4}
+
+    container_name: tinai-webui
+    restart: unless-stopped
+
+    # Démarre seulement quand tinai est healthy (llama-server up)
+    depends_on:
+      tinai:
+        condition: service_healthy
+
+    ports:
+      - "${PORT_WEBUI:-3000}:8080"  # Open WebUI → http://localhost:3000
+
+    volumes:
+      - ${WEBUI_DATA_DIR:-./data/webui}:/app/backend/data  # BDD WebUI
+
+    environment:
+      # Pointe vers le service tinai sur le réseau interne
+      OPENAI_API_BASE_URL: http://tinai:${PORT_LLAMA:-8081}/v1
+      OPENAI_API_KEY:      ${TINAI_API_KEY:-sk-tinai}
+      WEBUI_SECRET_KEY:    ${WEBUI_SECRET_KEY:-tinai-secret-change-me}
+      WEBUI_AUTH:          ${WEBUI_AUTH:-True}
+      DATA_DIR:            /app/backend/data
+      PORT:                8080
+      HOST:                0.0.0.0
+
+    mem_limit: ${WEBUI_MEM_LIMIT:-3g}
+    mem_reservation: 512m
+
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - tinai-net
+
+  # ── Monitoring léger (sidecar optionnel) ──────────────────────
   monitor:
     image: alpine:3.20
     container_name: tinai-monitor
@@ -87,20 +131,17 @@ services:
       - monitoring   # Activer avec : docker compose --profile monitoring up
 
     volumes:
-      - tinai-logs:/var/log/tinai:ro   # Accès lecture seule aux logs
+      - tinai-logs:/var/log/tinai:ro
 
-    # Serveur HTTP minimaliste qui expose les stats du conteneur tinai
     command: >
       sh -c "
         apk add --no-cache curl procps &&
         while true; do
-          TIMESTAMP=\$$(date -u +%s)
-          LOGSIZE_LLAMA=\$$(stat -c%s /var/log/tinai/llama.log 2>/dev/null || echo 0)
-          LOGSIZE_WEBUI=\$$(stat -c%s /var/log/tinai/webui.log 2>/dev/null || echo 0)
-          LOGSIZE_FANG=\$$(stat -c%s /var/log/tinai/openfang.log 2>/dev/null || echo 0)
-          printf 'tinai_log_bytes{service=\"llama\"} %s %s\n' \"\$$LOGSIZE_LLAMA\" \"\$$TIMESTAMP\"
-          printf 'tinai_log_bytes{service=\"webui\"} %s %s\n' \"\$$LOGSIZE_WEBUI\" \"\$$TIMESTAMP\"
-          printf 'tinai_log_bytes{service=\"openfang\"} %s %s\n' \"\$$LOGSIZE_FANG\" \"\$$TIMESTAMP\"
+          TIMESTAMP=$$(date -u +%s)
+          LOGSIZE_LLAMA=$$(stat -c%s /var/log/tinai/llama.log 2>/dev/null || echo 0)
+          LOGSIZE_FANG=$$(stat -c%s /var/log/tinai/openfang.log 2>/dev/null || echo 0)
+          printf 'tinai_log_bytes{service=\"llama\"} %s %s\n' \"$$LOGSIZE_LLAMA\" \"$$TIMESTAMP\"
+          printf 'tinai_log_bytes{service=\"openfang\"} %s %s\n' \"$$LOGSIZE_FANG\" \"$$TIMESTAMP\"
           sleep 30
         done | nc -l -p 9090 -k
       "
