@@ -57,7 +57,7 @@ services:
     mem_reservation: 2g
 
     healthcheck:
-      test: ["/usr/local/bin/healthcheck.sh"]
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
       interval: 30s
       timeout: 10s
       start_period: 60s
