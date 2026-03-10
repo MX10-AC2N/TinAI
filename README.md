@@ -5,8 +5,7 @@
 **Local AI stack — 100% offline, CPU-only, two focused Docker containers.**  
 **Stack IA locale — 100 % offline, CPU only, deux conteneurs Docker dédiés.**
 
-[![CI amd64](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml)
-[![CI arm64](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml/badge.svg?branch=main&label=arm64)](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml)
+[![CI-TinAI](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-orange.svg)](./LICENSE)
 [![Version](https://img.shields.io/badge/version-4.0.0-blue)](https://github.com/MX10-AC2N/TinAI/releases)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io-2496ED?logo=docker)](https://ghcr.io/MX10-AC2N/tinai)
