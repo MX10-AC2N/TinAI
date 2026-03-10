@@ -83,8 +83,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Open WebUI + huggingface_hub ──────────────────────────────────
-# DATA_DIR pointe vers /app/backend/data (convention Open WebUI)
+# Force PyTorch CPU-only pour éviter les ~7 Go de binaires CUDA
+# (nvidia-cuda-*, cuda-bindings, etc.) installés automatiquement
+# par sentence-transformers sur amd64.
+# La stack llama.cpp gère l'inférence GPU via llama-server.
 RUN pip install --no-cache-dir \
+    torch --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir \
     open-webui \
     huggingface_hub \
     && pip cache purge \
