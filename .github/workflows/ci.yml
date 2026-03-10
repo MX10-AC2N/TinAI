@@ -372,14 +372,12 @@ jobs:
             printf '**Branch :** `%s`\n\n' "${{ github.ref_name }}"
             printf -- '---\n\n'
             for arch in amd64 arm64; do
-              printf '## %s\n\n' "$arch"
               if [ -f "reports/TEST-REPORT-${arch}.md" ]; then
-                awk '/^## État/,/^## Services/' "reports/TEST-REPORT-${arch}.md" \
-                  | grep -v "^## Services" || true
+                # Inclure le rapport complet, en sautant seulement la ligne de titre h1
+                tail -n +3 "reports/TEST-REPORT-${arch}.md"
               else
-                printf '> Rapport non disponible pour %s\n' "$arch"
+                printf '## %s\n\n> ⚠️ Rapport non disponible\n\n' "$arch"
               fi
-              printf '\n'
             done
             printf -- '---\n\n'
             printf '*Rapports détaillés disponibles en artifacts du workflow.*\n'
@@ -394,5 +392,5 @@ jobs:
           git diff --cached --quiet && echo "Aucun changement" && exit 0
           git commit -m "ci: TEST-REPORT #${{ github.run_number }} (amd64 + arm64)"
           for i in 1 2 3; do
-            git push && break || git pull --rebase origin main
+            git push && break || git pull --rebase --strategy-option=theirs origin main
           done
