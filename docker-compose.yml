@@ -60,7 +60,7 @@ services:
       test: ["CMD", "/usr/local/bin/healthcheck.sh"]
       interval: 10s
       timeout: 5s
-      start_period: 25s   # openfang startsecs=15 → running à ~16s
+      start_period: 25s
       retries: 3
 
     logging:
@@ -82,10 +82,10 @@ services:
     container_name: tinai-webui
     restart: unless-stopped
 
-    # Démarre seulement quand tinai est healthy (llama-server up)
+    # Démarre dès que tinai tourne (le CI et l'utilisateur gèrent l'attente)
     depends_on:
       tinai:
-        condition: service_healthy
+        condition: service_started
 
     ports:
       - "${PORT_WEBUI:-3000}:8080"  # Open WebUI → http://localhost:3000
