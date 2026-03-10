@@ -60,7 +60,7 @@ services:
       test: ["CMD", "/usr/local/bin/healthcheck.sh"]
       interval: 30s
       timeout: 10s
-      start_period: 60s
+      start_period: 60s   # openfang startsecs=15 → healthy en ~20s
       retries: 3
 
     logging:
