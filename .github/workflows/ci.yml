@@ -302,9 +302,9 @@ jobs:
             printf '## Logs OpenFang\n\n```\n%s\n```\n\n' "$LOG_FANG"
             printf '## Logs Open WebUI\n\n```\n%s\n```\n\n' "$LOG_WEBUI"
             printf -- '---\n\n## Notes\n'
-            printf '- llama-server : modèle non téléchargé en CI (normal)\n'
-            printf '- Open WebUI   : conteneur dédié, démarre sans attendre llama\n'
-            printf '- OpenFang     : daemon Rust démarré\n'
+            printf -- '- llama-server : modèle non téléchargé en CI (normal)\n'
+            printf -- '- Open WebUI   : conteneur dédié, démarre sans attendre llama\n'
+            printf -- '- OpenFang     : daemon Rust démarré\n'
           } > "$REPORT"
           cat "$REPORT"
 
