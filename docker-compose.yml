@@ -1,60 +1,120 @@
 # ══════════════════════════════════════════════════════════════════
-#  TinAI v4 – docker-compose.yml
-#  Deux conteneurs séparés :
-#    tinai   → llama.cpp + OpenFang  (Dockerfile)
-#    webui   → Open WebUI            (Dockerfile.webui)
+#  TinAI v5 – docker-compose.yml
+#
+#  Services :
+#    llama   → ghcr.io/ggml-org/llama.cpp:server  (toujours actif)
+#    tinai   → OpenFang (Dockerfile)               (toujours actif)
+#    webui   → Open WebUI                          (profil : webui)
+#
+#  Démarrage minimal (sans Open WebUI) :
+#    docker compose up -d
+#
+#  Avec Open WebUI :
+#    docker compose --profile webui up -d
 # ══════════════════════════════════════════════════════════════════
 
 services:
 
-  # ── Backend : llama-server + OpenFang ─────────────────────────
+  # ── llama.cpp (image officielle) ──────────────────────────────
+  llama:
+    image: ${LLAMA_IMAGE:-ghcr.io/ggml-org/llama.cpp:server}
+    container_name: tinai-llama
+    restart: unless-stopped
+
+    ports:
+      - "${PORT_LLAMA:-8081}:8080"   # API OpenAI-compatible + WebUI intégrée
+
+    volumes:
+      - ${MODELS_DIR:-./models}:/models  # Modèles GGUF
+
+    environment:
+      # llama-server lit ces variables nativement
+      LLAMA_ARG_MODEL:        /models/${LLAMA_HF_FILE:-qwen3-1.7b-q5_k_m.gguf}
+      LLAMA_ARG_HOST:         0.0.0.0
+      LLAMA_ARG_PORT:         8080
+      LLAMA_ARG_CTX_SIZE:     ${LLAMA_CTX_SIZE:-8192}
+      LLAMA_ARG_N_PARALLEL:   ${LLAMA_N_PARALLEL:-1}
+      LLAMA_ARG_THREADS:      ${LLAMA_THREADS:-4}
+      LLAMA_ARG_N_GPU_LAYERS: ${LLAMA_GPU_LAYERS:-0}
+      LLAMA_ARG_API_KEY:      ${TINAI_API_KEY:-sk-tinai}
+      # WebUI intégrée llama.cpp (léger, sans Open WebUI)
+      # Accessible sur http://localhost:${PORT_LLAMA}/
+      LLAMA_ARG_PATH:         /app/public
+
+    # Téléchargement du modèle au 1er démarrage si absent
+    # L'image officielle gère --hf-repo / --hf-file nativement
+    # mais on laisse le modèle sur volume pour persistance.
+    # → Dépose ton .gguf dans ./models/ avant de démarrer,
+    #   ou configure LLAMA_HF_REPO / LLAMA_HF_FILE ci-dessous.
+    command: >
+      --model /models/${LLAMA_HF_FILE:-qwen3-1.7b-q5_k_m.gguf}
+      --host 0.0.0.0
+      --port 8080
+      --ctx-size ${LLAMA_CTX_SIZE:-8192}
+      --threads ${LLAMA_THREADS:-4}
+      --n-gpu-layers ${LLAMA_GPU_LAYERS:-0}
+      --api-key ${TINAI_API_KEY:-sk-tinai}
+      --alias ${LLAMA_MODEL_ALIAS:-qwen3-1.7b}
+      --hf-repo ${LLAMA_HF_REPO:-Qwen/Qwen3-1.7B-GGUF}
+      --hf-file ${LLAMA_HF_FILE:-qwen3-1.7b-q5_k_m.gguf}
+
+    mem_limit: ${MEM_LIMIT:-6g}
+    mem_reservation: 2g
+
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s   # téléchargement possible au 1er run
+      retries: 5
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - tinai-net
+
+  # ── OpenFang (agent OS) ────────────────────────────────────────
   tinai:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ${TINAI_IMAGE:-tinai:v4}
+    image: ${TINAI_IMAGE:-tinai:v5}
 
     container_name: tinai
     restart: unless-stopped
 
+    depends_on:
+      llama:
+        condition: service_started
+
     ports:
-      - "${PORT_OPENFANG:-4200}:4200"  # OpenFang    → http://localhost:4200
-      - "${PORT_LLAMA:-8081}:8081"     # llama-server API (OpenAI-compatible)
+      - "${PORT_OPENFANG:-4200}:4200"   # Dashboard + API OpenFang
 
     volumes:
-      - ${MODELS_DIR:-./models}:/data/models               # Modèles GGUF
-      - ${OPENFANG_DATA_DIR:-./data/openfang}:/root/.openfang  # Config & agents
-      - tinai-logs:/var/log/tinai
+      - ${OPENFANG_DATA_DIR:-./data/openfang}:/root/.openfang
 
     environment:
-      # ── Modèle ──────────────────────────────────────────────
-      LLAMA_HF_REPO:    ${LLAMA_HF_REPO:-Qwen/Qwen3-1.7B-GGUF}
-      LLAMA_HF_FILE:    ${LLAMA_HF_FILE:-qwen3-1.7b-q5_k_m.gguf}
-      LLAMA_MODEL_PATH: /data/models/${LLAMA_HF_FILE:-qwen3-1.7b-q5_k_m.gguf}
-
-      # ── Paramètres llama.cpp ─────────────────────────────────
-      LLAMA_CTX_SIZE:   ${LLAMA_CTX_SIZE:-8192}
-      LLAMA_THREADS:    ${LLAMA_THREADS:-4}
-      LLAMA_GPU_LAYERS: ${LLAMA_GPU_LAYERS:-0}
-      LLAMA_PORT:       8081
-
-      # ── Ports internes ───────────────────────────────────────
-      OPENFANG_PORT:    4200
-
-      # ── Sécurité ─────────────────────────────────────────────
-      TINAI_API_KEY:    ${TINAI_API_KEY:-sk-tinai}
-
-      # ── OpenFang canaux (optionnel) ──────────────────────────
+      LLAMA_PORT:          8081          # port externe exposé par docker compose
+      LLAMA_HOST:          llama         # nom du service sur tinai-net
+      OPENFANG_PORT:       4200
+      TINAI_API_KEY:       ${TINAI_API_KEY:-sk-tinai}
+      LLAMA_HF_FILE:       ${LLAMA_HF_FILE:-qwen3-1.7b-q5_k_m.gguf}
+      # Canaux de messagerie (optionnel)
       TELEGRAM_BOT_TOKEN:  ${TELEGRAM_BOT_TOKEN:-}
       DISCORD_BOT_TOKEN:   ${DISCORD_BOT_TOKEN:-}
       SLACK_BOT_TOKEN:     ${SLACK_BOT_TOKEN:-}
       SLACK_APP_TOKEN:     ${SLACK_APP_TOKEN:-}
+      # Providers LLM externes (optionnel)
       ANTHROPIC_API_KEY:   ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY:      ${OPENAI_API_KEY:-}
       GROQ_API_KEY:        ${GROQ_API_KEY:-}
 
-    mem_limit: ${MEM_LIMIT:-6g}
-    mem_reservation: 2g
+    mem_limit: 1g
+    mem_reservation: 256m
 
     healthcheck:
       test: ["CMD", "/usr/local/bin/healthcheck.sh"]
@@ -72,30 +132,27 @@ services:
     networks:
       - tinai-net
 
-  # ── Frontend : Open WebUI ──────────────────────────────────────
+  # ── Open WebUI (optionnel — profil webui) ─────────────────────
   webui:
-    # Image officielle Open WebUI — pas de build custom nécessaire
-    # :main-slim = sans modèles bundled, idéal pour SBC
-    # Épingler une version pour la prod : ghcr.io/open-webui/open-webui:v0.6.5
-    image: ${WEBUI_IMAGE:-ghcr.io/open-webui/open-webui:main-slim}
+    profiles:
+      - webui   # docker compose --profile webui up -d
 
+    image: ${WEBUI_IMAGE:-ghcr.io/open-webui/open-webui:main-slim}
     container_name: tinai-webui
     restart: unless-stopped
 
-    # Démarre dès que tinai tourne (le CI et l'utilisateur gèrent l'attente)
     depends_on:
-      tinai:
+      llama:
         condition: service_started
 
     ports:
-      - "${PORT_WEBUI:-3000}:8080"  # Open WebUI → http://localhost:3000
+      - "${PORT_WEBUI:-3000}:8080"
 
     volumes:
-      - ${WEBUI_DATA_DIR:-./data/webui}:/app/backend/data  # BDD WebUI
+      - ${WEBUI_DATA_DIR:-./data/webui}:/app/backend/data
 
     environment:
-      # Pointe vers le service tinai sur le réseau interne
-      OPENAI_API_BASE_URL: http://tinai:${PORT_LLAMA:-8081}/v1
+      OPENAI_API_BASE_URL: http://llama:8080/v1
       OPENAI_API_KEY:      ${TINAI_API_KEY:-sk-tinai}
       WEBUI_SECRET_KEY:    ${WEBUI_SECRET_KEY:-tinai-secret-change-me}
       WEBUI_AUTH:          ${WEBUI_AUTH:-False}
@@ -121,46 +178,6 @@ services:
 
     networks:
       - tinai-net
-
-  # ── Monitoring léger (sidecar optionnel) ──────────────────────
-  monitor:
-    image: alpine:3.20
-    container_name: tinai-monitor
-    restart: unless-stopped
-    profiles:
-      - monitoring   # Activer avec : docker compose --profile monitoring up
-
-    volumes:
-      - tinai-logs:/var/log/tinai:ro
-
-    command: >
-      sh -c "
-        apk add --no-cache curl procps &&
-        while true; do
-          TIMESTAMP=$$(date -u +%s)
-          LOGSIZE_LLAMA=$$(stat -c%s /var/log/tinai/llama.log 2>/dev/null || echo 0)
-          LOGSIZE_FANG=$$(stat -c%s /var/log/tinai/openfang.log 2>/dev/null || echo 0)
-          printf 'tinai_log_bytes{service=\"llama\"} %s %s\n' \"$$LOGSIZE_LLAMA\" \"$$TIMESTAMP\"
-          printf 'tinai_log_bytes{service=\"openfang\"} %s %s\n' \"$$LOGSIZE_FANG\" \"$$TIMESTAMP\"
-          sleep 30
-        done | nc -l -p 9090 -k
-      "
-
-    ports:
-      - "${PORT_MONITOR:-9090}:9090"
-
-    networks:
-      - tinai-net
-
-    logging:
-      driver: json-file
-      options:
-        max-size: "1m"
-        max-file: "1"
-
-# ── Volumes nommés ───────────────────────────────────────────────
-volumes:
-  tinai-logs:
 
 # ── Réseau ───────────────────────────────────────────────────────
 networks:

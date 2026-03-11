@@ -1,7 +1,5 @@
 <div align="center">
 
-# 🛠️ WIP 🛠️
-
 # 🧠 TinAI
 
 **Local AI stack — 100% offline, CPU-only, two focused Docker containers.**  

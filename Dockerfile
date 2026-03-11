@@ -1,45 +1,13 @@
 # ══════════════════════════════════════════════════════════════════
-#  TinAI – Image principale (llama.cpp + OpenFang)
+#  TinAI v5 – Image principale (OpenFang uniquement)
+#  llama.cpp → image officielle ghcr.io/ggml-org/llama.cpp:server
 #  Cibles : linux/amd64 · linux/arm64
-#  Open WebUI est désormais dans son propre conteneur (Dockerfile.webui)
-#  Modèle  : configurable via LLAMA_HF_* (téléchargé au 1er run)
 # ══════════════════════════════════════════════════════════════════
 ARG TARGETARCH
 ARG TARGETPLATFORM
 
 # ══════════════════════════════════════════════════════════════════
-#  Étape 1 : Build llama.cpp (optimisé AVX/NEON selon arch)
-# ══════════════════════════════════════════════════════════════════
-FROM debian:bookworm-slim AS llama-builder
-ARG TARGETARCH
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git cmake make g++ libssl-dev curl ca-certificates \
-    libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Script de détection CPU — détermine les flags cmake optimaux
-COPY scripts/detect-cpu.sh /usr/local/bin/detect-cpu.sh
-RUN chmod +x /usr/local/bin/detect-cpu.sh
-
-RUN git clone --depth=1 https://github.com/ggml-org/llama.cpp /src
-WORKDIR /src
-
-RUN set -eux; \
-    CMAKE_EXTRA=$(detect-cpu.sh --cmake); \
-    echo "[build] CPU profile : $(detect-cpu.sh --summary)"; \
-    echo "[build] CMAKE flags : ${CMAKE_EXTRA}"; \
-    cmake -B build \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DGGML_NATIVE=OFF \
-        -DLLAMA_BUILD_SERVER=ON \
-        -DBUILD_SHARED_LIBS=OFF \
-        ${CMAKE_EXTRA} \
-    && cmake --build build --config Release -j$(nproc) --target llama-server \
-    && strip build/bin/llama-server
-
-# ══════════════════════════════════════════════════════════════════
-#  Étape 2 : Build OpenFang (binaire Rust)
+#  Étape 1 : Build OpenFang (binaire Rust)
 # ══════════════════════════════════════════════════════════════════
 FROM debian:bookworm-slim AS openfang-builder
 ARG TARGETARCH
@@ -65,7 +33,7 @@ RUN set -eux; \
     && strip /openfang-bin
 
 # ══════════════════════════════════════════════════════════════════
-#  Étape 3 : Image finale – runtime minimal (pas de Python/pip)
+#  Étape 2 : Image finale – runtime minimal
 # ══════════════════════════════════════════════════════════════════
 FROM debian:bookworm-slim
 
@@ -73,61 +41,40 @@ ARG TARGETARCH
 ARG TARGETPLATFORM
 
 LABEL org.opencontainers.image.title="TinAI"
-LABEL org.opencontainers.image.description="llama.cpp + OpenFang – offline AI backend"
+LABEL org.opencontainers.image.description="OpenFang AI agent – llama.cpp via image officielle"
 LABEL org.opencontainers.image.source="https://github.com/MX10-AC2N/TinAI"
 LABEL org.opencontainers.image.architecture="${TARGETPLATFORM}"
 LABEL org.opencontainers.image.licenses="MIT"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates libssl3 \
-    supervisor procps wget \
-    libgomp1 \
+    curl ca-certificates libssl3 procps \
     && rm -rf /var/lib/apt/lists/*
 
-# ── Binaires compilés ─────────────────────────────────────────────
-COPY --from=llama-builder    /src/build/bin/llama-server /usr/local/bin/llama-server
-COPY --from=openfang-builder /openfang-bin               /usr/local/bin/openfang
-
-RUN chmod +x /usr/local/bin/llama-server /usr/local/bin/openfang
+# ── Binaire OpenFang ──────────────────────────────────────────────
+COPY --from=openfang-builder /openfang-bin /usr/local/bin/openfang
+RUN chmod +x /usr/local/bin/openfang
 
 # ── Répertoires de données ────────────────────────────────────────
-RUN mkdir -p \
-    /data/models \
-    /root/.openfang \
-    /var/log/tinai
+RUN mkdir -p /root/.openfang /var/log/tinai
 
-# ── Scripts & config ──────────────────────────────────────────────
-COPY scripts/detect-cpu.sh     /usr/local/bin/detect-cpu.sh
-COPY scripts/start-llama.sh    /usr/local/bin/start-llama.sh
+# ── Scripts ───────────────────────────────────────────────────────
 COPY scripts/start-openfang.sh /usr/local/bin/start-openfang.sh
 COPY scripts/healthcheck.sh    /usr/local/bin/healthcheck.sh
-COPY supervisord.conf          /etc/supervisor/conf.d/tinai.conf
-
 RUN chmod +x \
-    /usr/local/bin/detect-cpu.sh \
-    /usr/local/bin/start-llama.sh \
     /usr/local/bin/start-openfang.sh \
     /usr/local/bin/healthcheck.sh
 
 # ── Variables d'environnement ─────────────────────────────────────
-# TINAI_API_KEY est intentionnellement absent — injecté par docker-compose depuis .env
-# (évite le warning BuildKit "SecretsUsedInArgOrEnv")
-ENV LLAMA_MODEL_PATH=/data/models/model.gguf \
-    LLAMA_HF_REPO=Qwen/Qwen3-1.7B-GGUF \
-    LLAMA_HF_FILE=qwen3-1.7b-q5_k_m.gguf \
-    LLAMA_CTX_SIZE=8192 \
-    LLAMA_THREADS=4 \
-    LLAMA_GPU_LAYERS=0 \
+# TINAI_API_KEY intentionnellement absent — injecté par docker-compose
+ENV OPENFANG_PORT=4200 \
     LLAMA_PORT=8081 \
-    OPENFANG_PORT=4200 \
-    DATA_DIR=/data \
     HOME=/root
 
-VOLUME ["/data/models", "/root/.openfang"]
+VOLUME ["/root/.openfang"]
 
-EXPOSE 4200 8081
+EXPOSE 4200
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=10s --timeout=5s --start-period=25s --retries=3 \
     CMD /usr/local/bin/healthcheck.sh
 
-ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/tinai.conf"]
+ENTRYPOINT ["/usr/local/bin/start-openfang.sh"]
