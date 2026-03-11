@@ -29,7 +29,7 @@ services:
 
     environment:
       # llama-server lit ces variables nativement
-      LLAMA_ARG_MODEL:        /models/${LLAMA_HF_FILE:-qwen3-1.7b-q5_k_m.gguf}
+      LLAMA_ARG_MODEL:        /models/${LLAMA_HF_FILE:-Qwen3-1.7B-Q5_K_M.gguf}
       LLAMA_ARG_HOST:         0.0.0.0
       LLAMA_ARG_PORT:         8080
       LLAMA_ARG_CTX_SIZE:     ${LLAMA_CTX_SIZE:-8192}
@@ -47,7 +47,7 @@ services:
     # → Dépose ton .gguf dans ./models/ avant de démarrer,
     #   ou configure LLAMA_HF_REPO / LLAMA_HF_FILE ci-dessous.
     command: >
-      --model /models/${LLAMA_HF_FILE:-qwen3-1.7b-q5_k_m.gguf}
+      --model /models/${LLAMA_HF_FILE:-Qwen3-1.7B-Q5_K_M.gguf}
       --host 0.0.0.0
       --port 8080
       --ctx-size ${LLAMA_CTX_SIZE:-8192}
@@ -56,7 +56,7 @@ services:
       --api-key ${TINAI_API_KEY:-sk-tinai}
       --alias ${LLAMA_MODEL_ALIAS:-qwen3-1.7b}
       --hf-repo ${LLAMA_HF_REPO:-Qwen/Qwen3-1.7B-GGUF}
-      --hf-file ${LLAMA_HF_FILE:-qwen3-1.7b-q5_k_m.gguf}
+      --hf-file ${LLAMA_HF_FILE:-Qwen3-1.7B-Q5_K_M.gguf}
 
     mem_limit: ${MEM_LIMIT:-6g}
     mem_reservation: 2g
@@ -102,7 +102,7 @@ services:
       LLAMA_HOST:          llama         # nom du service sur tinai-net
       OPENFANG_PORT:       4200
       TINAI_API_KEY:       ${TINAI_API_KEY:-sk-tinai}
-      LLAMA_HF_FILE:       ${LLAMA_HF_FILE:-qwen3-1.7b-q5_k_m.gguf}
+      LLAMA_HF_FILE:       ${LLAMA_HF_FILE:-Qwen3-1.7B-Q5_K_M.gguf}
       # Canaux de messagerie (optionnel)
       TELEGRAM_BOT_TOKEN:  ${TELEGRAM_BOT_TOKEN:-}
       DISCORD_BOT_TOKEN:   ${DISCORD_BOT_TOKEN:-}
