@@ -110,6 +110,8 @@ RUN chmod +x \
     /usr/local/bin/healthcheck.sh
 
 # ── Variables d'environnement ─────────────────────────────────────
+# TINAI_API_KEY est intentionnellement absent — injecté par docker-compose depuis .env
+# (évite le warning BuildKit "SecretsUsedInArgOrEnv")
 ENV LLAMA_MODEL_PATH=/data/models/model.gguf \
     LLAMA_HF_REPO=Qwen/Qwen3-1.7B-GGUF \
     LLAMA_HF_FILE=qwen3-1.7b-q5_k_m.gguf \
@@ -118,7 +120,6 @@ ENV LLAMA_MODEL_PATH=/data/models/model.gguf \
     LLAMA_GPU_LAYERS=0 \
     LLAMA_PORT=8081 \
     OPENFANG_PORT=4200 \
-    TINAI_API_KEY=sk-tinai \
     DATA_DIR=/data \
     HOME=/root
 
