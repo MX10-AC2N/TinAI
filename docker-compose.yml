@@ -74,10 +74,10 @@ services:
 
   # ── Frontend : Open WebUI ──────────────────────────────────────
   webui:
-    build:
-      context: .
-      dockerfile: Dockerfile.webui
-    image: ${WEBUI_IMAGE:-tinai-webui:v4}
+    # Image officielle Open WebUI — pas de build custom nécessaire
+    # :main-slim = sans modèles bundled, idéal pour Zimaboard/SBC
+    # Épingler une version pour la prod : ghcr.io/open-webui/open-webui:v0.6.5
+    image: ${WEBUI_IMAGE:-ghcr.io/open-webui/open-webui:main-slim}
 
     container_name: tinai-webui
     restart: unless-stopped
