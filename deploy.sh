@@ -1,9 +1,8 @@
 #!/bin/sh
 # ══════════════════════════════════════════════════════════════════
-#  TinAI – Script de déploiement
-#  Usage : ./deploy.sh [--profile webui]
-#  1. Lance docker compose up -d
-#  2. Si aucun modèle GGUF trouvé → propose select-model.sh
+#  TinAI – Point d'entrée unique pour le déploiement
+#  Remplace : docker compose up -d
+#  Usage    : ./deploy.sh [--profile webui]
 # ══════════════════════════════════════════════════════════════════
 set -eu
 
@@ -18,90 +17,68 @@ info() { printf "${C}→ %s${N}\n" "$*"; }
 warn() { printf "${Y}⚠ %s${N}\n" "$*"; }
 die()  { printf "${R}✗ %s${N}\n" "$*" >&2; exit 1; }
 
-# ── Récupérer le répertoire des modèles depuis .env ───────────────
-get_models_dir() {
-    if [ -f .env ]; then
-        MDIR=$(grep "^MODELS_DIR=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'")
-    fi
-    MDIR="${MDIR:-./models}"
-    # Résoudre le chemin relatif
-    case "$MDIR" in
-        /*) echo "$MDIR" ;;
-        *)  echo "${SCRIPT_DIR}/${MDIR#./}" ;;
-    esac
-}
-
-# ── Vérifier si un modèle GGUF est présent ────────────────────────
-has_model() {
-    MDIR="$1"
-    [ -d "$MDIR" ] && find "$MDIR" -maxdepth 1 -name "*.gguf" | grep -q . 2>/dev/null
-}
-
-# ─────────────────────────────────────────────────────────────────
-printf "\n${W}"
-printf "╔══════════════════════════════════════════════════╗\n"
-printf "║              TinAI – Déploiement                ║\n"
-printf "╚══════════════════════════════════════════════════╝\n"
-printf "${N}\n"
-
-# ── Vérifications préalables ──────────────────────────────────────
-command -v docker >/dev/null 2>&1  || die "docker non trouvé"
+# ── Prérequis ─────────────────────────────────────────────────────
+command -v docker >/dev/null 2>&1 || die "docker non trouvé"
 docker compose version >/dev/null 2>&1 || die "docker compose non trouvé"
+[ -f docker-compose.yml ] || die "Lance ce script depuis le dossier TinAI"
 
-[ -f docker-compose.yml ] || die "docker-compose.yml introuvable (lancer depuis le dossier TinAI)"
-
+# ── .env ──────────────────────────────────────────────────────────
 if [ ! -f .env ]; then
     warn ".env absent — copie depuis .env.example"
     cp .env.example .env || die ".env.example introuvable"
-    ok ".env créé — édite-le si besoin avant de continuer"
 fi
 
-# ── Docker compose up ─────────────────────────────────────────────
+# ── Profil optionnel (--profile webui) ────────────────────────────
 PROFILES=""
 for arg in "$@"; do
     case "$arg" in
-        --profile) shift; PROFILES="--profile $1" ;;
         --profile=*) PROFILES="--profile ${arg#--profile=}" ;;
+        --profile)   shift; PROFILES="--profile $1" ;;
     esac
 done
 
+# ── Banner ────────────────────────────────────────────────────────
+printf "\n${W}"
+printf "╔══════════════════════════════════════════════════╗\n"
+printf "║              TinAI – Déploiement v5             ║\n"
+printf "╚══════════════════════════════════════════════════╝\n"
+printf "${N}\n"
+
+# ── Docker compose up ─────────────────────────────────────────────
 info "Démarrage des conteneurs..."
 # shellcheck disable=SC2086
-docker compose $PROFILES up -d
+docker compose $PROFILES up -d --build
 printf "\n"
 
-docker compose ps
-printf "\n"
-
-# ── Vérifier la présence d'un modèle GGUF ────────────────────────
-MODELS_DIR=$(get_models_dir)
+# ── Vérifier la présence d'un modèle ─────────────────────────────
+MODELS_DIR="$(grep "^MODELS_DIR=" .env 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr -d "'")"
+MODELS_DIR="${MODELS_DIR:-./models}"
+case "$MODELS_DIR" in /*) ;; *) MODELS_DIR="${SCRIPT_DIR}/${MODELS_DIR#./}" ;; esac
 mkdir -p "$MODELS_DIR"
 
-if has_model "$MODELS_DIR"; then
-    MODELS=$(find "$MODELS_DIR" -maxdepth 1 -name "*.gguf" | sort)
-    ok "Modèle(s) trouvé(s) dans ${MODELS_DIR} :"
-    echo "$MODELS" | while read -r f; do
+if find "$MODELS_DIR" -maxdepth 1 -name "*.gguf" | grep -q . 2>/dev/null; then
+    # Modèle présent
+    ok "Modèle(s) présent(s) :"
+    find "$MODELS_DIR" -maxdepth 1 -name "*.gguf" | sort | while read -r f; do
         SIZE=$(ls -lh "$f" | awk '{print $5}')
         printf "  • %s  (%s)\n" "$(basename "$f")" "$SIZE"
     done
-    printf "\n"
-    printf "${C}→ llama-server va démarrer avec le modèle configuré dans .env${N}\n"
-    printf "${C}→ Pour changer de modèle : ./scripts/select-model.sh${N}\n\n"
+    printf "\n${C}Pour changer de modèle : ${W}./scripts/select-model.sh${N}\n\n"
 else
-    printf "${Y}"
+    # Aucun modèle — lancer le sélecteur
+    printf "\n${Y}"
     printf "╔══════════════════════════════════════════════════╗\n"
-    printf "║   Aucun modèle GGUF trouvé dans %-16s║\n" "${MODELS_DIR}/"
-    printf "║   llama-server attend un modèle pour démarrer.  ║\n"
+    printf "║   Aucun modèle GGUF dans %-22s  ║\n" "${MODELS_DIR}/"
+    printf "║   llama-server attend un modèle.                ║\n"
     printf "╚══════════════════════════════════════════════════╝\n"
     printf "${N}\n"
 
-    printf "Lancer le sélecteur de modèle maintenant ? [O/n] : "
+    printf "Télécharger un modèle maintenant ? [O/n] : "
     read -r LAUNCH
     case "$LAUNCH" in
         [nN])
-            printf "\n"
-            warn "Pas de modèle — llama-server restera inactif."
-            printf "Lance quand tu veux : ${W}./scripts/select-model.sh${N}\n\n"
+            warn "Sans modèle, llama-server reste en attente."
+            printf "${C}Lance quand tu veux : ${W}./scripts/select-model.sh${N}\n\n"
             ;;
         *)
             printf "\n"
