@@ -25,9 +25,16 @@ services:
       - "${PORT_LLAMA:-8081}:8080"   # API OpenAI-compatible + WebUI intégrée
 
     volumes:
-      - ${MODELS_DIR:-./models}:/models  # Modèles GGUF
+      - ${MODELS_DIR:-./models}:/models                          # Modèles GGUF
+      - ./scripts/llama-entrypoint.sh:/llama-entrypoint.sh:ro   # Wrapper no-model
+
+    entrypoint: ["/llama-entrypoint.sh"]
 
     environment:
+      # Variables lues par llama-entrypoint.sh
+      LLAMA_HF_REPO:          ${LLAMA_HF_REPO:-Qwen/Qwen3-1.7B-GGUF}
+      LLAMA_HF_FILE:          ${LLAMA_HF_FILE:-Qwen3-1.7B-Q5_K_M.gguf}
+      MODELS_DIR:             /models
       # llama-server lit ces variables nativement
       LLAMA_ARG_MODEL:        /models/${LLAMA_HF_FILE:-Qwen3-1.7B-Q5_K_M.gguf}
       LLAMA_ARG_HOST:         0.0.0.0
