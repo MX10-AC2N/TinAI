@@ -1,5 +1,5 @@
 <div align="center">
-
+# 🛠️ Work in progress.
 # 🧠 TinAI
 
 **Local AI stack — 100% offline, CPU-only, two focused Docker containers.**  
