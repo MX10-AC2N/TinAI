@@ -129,12 +129,7 @@ jobs:
           key: buildx-tinai-${{ matrix.arch }}-${{ hashFiles('Dockerfile', 'supervisord.conf', 'scripts/**') }}
           restore-keys: buildx-tinai-${{ matrix.arch }}-
 
-      - name: Cache Docker layers – webui
-        uses: actions/cache@v4
-        with:
-          path: /tmp/buildx-cache-webui
-          key: buildx-webui-${{ matrix.arch }}-${{ hashFiles('Dockerfile.webui') }}
-          restore-keys: buildx-webui-${{ matrix.arch }}-
+      # Cache webui supprimé — image officielle pullée directement
 
       - name: Setup .env CI
         run: |
@@ -168,19 +163,13 @@ jobs:
           mv /tmp/buildx-cache-tinai-new /tmp/buildx-cache-tinai
           echo "✅ Build tinai ${{ matrix.arch }} OK"
 
-      - name: Build image tinai-webui:v4-${{ matrix.arch }}
+      - name: Pull image Open WebUI (officielle)
         run: |
-          docker buildx build \
-            --platform "${{ matrix.platform }}" \
-            --cache-from "type=local,src=/tmp/buildx-cache-webui" \
-            --cache-to   "type=local,dest=/tmp/buildx-cache-webui-new,mode=max" \
-            --load \
-            -t "tinai-webui:v4-${{ matrix.arch }}" \
-            -f Dockerfile.webui \
-            .
-          rm -rf /tmp/buildx-cache-webui
-          mv /tmp/buildx-cache-webui-new /tmp/buildx-cache-webui
-          echo "✅ Build webui ${{ matrix.arch }} OK"
+          WEBUI_IMAGE=$(grep WEBUI_IMAGE .env | cut -d= -f2 | tr -d ' ' || echo "ghcr.io/open-webui/open-webui:main-slim")
+          WEBUI_IMAGE=${WEBUI_IMAGE:-ghcr.io/open-webui/open-webui:main-slim}
+          docker pull "${WEBUI_IMAGE}"
+          docker tag  "${WEBUI_IMAGE}" "tinai-webui:v4-${{ matrix.arch }}"
+          echo "✅ Image webui prête : ${WEBUI_IMAGE}"
 
       - name: Taille des images
         run: |
@@ -372,12 +361,14 @@ jobs:
             printf '**Branch :** `%s`\n\n' "${{ github.ref_name }}"
             printf -- '---\n\n'
             for arch in amd64 arm64; do
+              printf '## %s\n\n' "$arch"
               if [ -f "reports/TEST-REPORT-${arch}.md" ]; then
-                # Inclure le rapport complet, en sautant seulement la ligne de titre h1
-                tail -n +3 "reports/TEST-REPORT-${arch}.md"
+                awk '/^## État/,/^## Services/' "reports/TEST-REPORT-${arch}.md" \
+                  | grep -v "^## Services" || true
               else
-                printf '## %s\n\n> ⚠️ Rapport non disponible\n\n' "$arch"
+                printf '> Rapport non disponible pour %s\n' "$arch"
               fi
+              printf '\n'
             done
             printf -- '---\n\n'
             printf '*Rapports détaillés disponibles en artifacts du workflow.*\n'
@@ -392,5 +383,5 @@ jobs:
           git diff --cached --quiet && echo "Aucun changement" && exit 0
           git commit -m "ci: TEST-REPORT #${{ github.run_number }} (amd64 + arm64)"
           for i in 1 2 3; do
-            git push && break || git pull --rebase --strategy-option=theirs origin main
+            git push && break || git pull --rebase origin main
           done
