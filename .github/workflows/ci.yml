@@ -381,5 +381,5 @@ jobs:
           git diff --cached --quiet && echo "Aucun changement" && exit 0
           git commit -m "ci: TEST-REPORT #${{ github.run_number }} (amd64 + arm64)"
           for i in 1 2 3; do
-            git push && break || git pull --rebase origin main
+            git push && break || git pull --rebase -X theirs origin main
           done
