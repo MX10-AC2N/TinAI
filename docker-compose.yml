@@ -26,9 +26,9 @@ services:
 
     volumes:
       - ${MODELS_DIR:-./models}:/models                          # Modèles GGUF
-      - ./scripts/llama-entrypoint.sh:/llama-entrypoint.sh:ro   # Wrapper no-model
+      - ./scripts/llama-entrypoint.sh:/llama-entrypoint.sh       # Wrapper no-model
 
-    entrypoint: ["/llama-entrypoint.sh"]
+    entrypoint: ["sh", "/llama-entrypoint.sh"]
 
     environment:
       # Variables lues par llama-entrypoint.sh
