@@ -15,6 +15,7 @@ ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git cmake make g++ libssl-dev curl ca-certificates \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN git clone --depth=1 https://github.com/ggml-org/llama.cpp /src
@@ -79,6 +80,7 @@ LABEL org.opencontainers.image.licenses="MIT"
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates libssl3 \
     supervisor procps wget \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Binaires compilés ─────────────────────────────────────────────
