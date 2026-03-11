@@ -1,19 +1,33 @@
 # TinAI – Test Report
 
-**Date   :** 2026-03-11 20:59 UTC
-**Run    :** [#77](https://github.com/MX10-AC2N/TinAI/actions/runs/22974132672)
-**Commit :** `ec999d86fa0d2e0a3c8a7afd6a2a07168d35bc21`
+**Date   :** 2026-03-11 21:05 UTC
+**Run    :** [#78](https://github.com/MX10-AC2N/TinAI/actions/runs/22974366179)
+**Commit :** `e2294e6922a1f06cdbdbd7ae9b87060c4b71e769`
 **Branch :** `main`
 
 ---
 
 ## amd64
 
-> Rapport non disponible pour amd64
+## État des conteneurs
+
+```
+NAME          IMAGE                               COMMAND                  SERVICE   CREATED         STATUS                            PORTS
+tinai         tinai:v5-amd64                      "/usr/local/bin/star…"   tinai     6 seconds ago   Up 5 seconds (healthy)            0.0.0.0:4200->4200/tcp, [::]:4200->4200/tcp
+tinai-llama   ghcr.io/ggml-org/llama.cpp:server   "sh /llama-entrypoin…"   llama     6 seconds ago   Up 5 seconds (health: starting)   0.0.0.0:8081->8080/tcp, [::]:8081->8080/tcp
+```
+
 
 ## arm64
 
-> Rapport non disponible pour arm64
+## État des conteneurs
+
+```
+NAME          IMAGE                               COMMAND                  SERVICE   CREATED         STATUS                          PORTS
+tinai         tinai:v5-arm64                      "/usr/local/bin/star…"   tinai     5 seconds ago   Up 5 seconds (healthy)          0.0.0.0:4200->4200/tcp, [::]:4200->4200/tcp
+tinai-llama   ghcr.io/ggml-org/llama.cpp:server   "sh /llama-entrypoin…"   llama     6 seconds ago   Restarting (255) 1 second ago   
+```
+
 
 ---
 
