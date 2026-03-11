@@ -139,7 +139,7 @@ jobs:
           echo "MEM_LIMIT=4g"                          >> .env
           echo "WEBUI_MEM_LIMIT=2g"                    >> .env
           echo "TINAI_IMAGE=tinai:v4-${{ matrix.arch }}"      >> .env
-          echo "WEBUI_IMAGE=tinai-webui:v4-${{ matrix.arch }}" >> .env
+          echo "WEBUI_IMAGE=ghcr.io/open-webui/open-webui:main-slim" >> .env
           echo "TINAI_API_KEY=$(openssl rand -hex 16)"  >> .env
           echo "WEBUI_SECRET_KEY=$(openssl rand -hex 16)" >> .env
 
@@ -164,8 +164,7 @@ jobs:
 
       - name: Pull image Open WebUI (officielle)
         run: |
-          WEBUI_IMAGE=$(grep WEBUI_IMAGE .env | cut -d= -f2 | tr -d ' ' || echo "ghcr.io/open-webui/open-webui:main-slim")
-          WEBUI_IMAGE=${WEBUI_IMAGE:-ghcr.io/open-webui/open-webui:main-slim}
+          WEBUI_IMAGE="ghcr.io/open-webui/open-webui:main-slim"
           docker pull "${WEBUI_IMAGE}"
           docker tag  "${WEBUI_IMAGE}" "tinai-webui:v4-${{ matrix.arch }}"
           echo "✅ Image webui prête : ${WEBUI_IMAGE}"
