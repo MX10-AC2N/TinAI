@@ -15,20 +15,20 @@ ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git cmake make g++ libssl-dev curl ca-certificates \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
+
+# Script de détection CPU — détermine les flags cmake optimaux
+COPY scripts/detect-cpu.sh /usr/local/bin/detect-cpu.sh
+RUN chmod +x /usr/local/bin/detect-cpu.sh
 
 RUN git clone --depth=1 https://github.com/ggml-org/llama.cpp /src
 WORKDIR /src
 
 RUN set -eux; \
-    CMAKE_EXTRA=""; \
-    if [ "${TARGETARCH}" = "arm64" ]; then \
-        CMAKE_EXTRA="-DGGML_NEON=ON"; \
-    elif [ "${TARGETARCH}" = "amd64" ]; then \
-        # SSE4.2 uniquement — compatible Atom/Celeron/Pentium (Gemini Lake, Bay Trail…)
-        # AVX désactivé : non supporté sur Intel N3xxx/N4xxx/J4xxx
-        CMAKE_EXTRA="-DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF"; \
-    fi; \
+    CMAKE_EXTRA=$(detect-cpu.sh --cmake); \
+    echo "[build] CPU profile : $(detect-cpu.sh --summary)"; \
+    echo "[build] CMAKE flags : ${CMAKE_EXTRA}"; \
     cmake -B build \
         -DCMAKE_BUILD_TYPE=Release \
         -DGGML_NATIVE=OFF \
@@ -81,6 +81,7 @@ LABEL org.opencontainers.image.licenses="MIT"
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates libssl3 \
     supervisor procps wget \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Binaires compilés ─────────────────────────────────────────────
@@ -96,12 +97,14 @@ RUN mkdir -p \
     /var/log/tinai
 
 # ── Scripts & config ──────────────────────────────────────────────
+COPY scripts/detect-cpu.sh     /usr/local/bin/detect-cpu.sh
 COPY scripts/start-llama.sh    /usr/local/bin/start-llama.sh
 COPY scripts/start-openfang.sh /usr/local/bin/start-openfang.sh
 COPY scripts/healthcheck.sh    /usr/local/bin/healthcheck.sh
 COPY supervisord.conf          /etc/supervisor/conf.d/tinai.conf
 
 RUN chmod +x \
+    /usr/local/bin/detect-cpu.sh \
     /usr/local/bin/start-llama.sh \
     /usr/local/bin/start-openfang.sh \
     /usr/local/bin/healthcheck.sh
