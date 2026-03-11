@@ -15,7 +15,6 @@ ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git cmake make g++ libssl-dev curl ca-certificates \
-    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN git clone --depth=1 https://github.com/ggml-org/llama.cpp /src
@@ -26,7 +25,9 @@ RUN set -eux; \
     if [ "${TARGETARCH}" = "arm64" ]; then \
         CMAKE_EXTRA="-DGGML_NEON=ON"; \
     elif [ "${TARGETARCH}" = "amd64" ]; then \
-        CMAKE_EXTRA="-DGGML_AVX=ON"; \
+        # SSE4.2 uniquement — compatible Atom/Celeron/Pentium (Gemini Lake, Bay Trail…)
+        # AVX désactivé : non supporté sur Intel N3xxx/N4xxx/J4xxx
+        CMAKE_EXTRA="-DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF"; \
     fi; \
     cmake -B build \
         -DCMAKE_BUILD_TYPE=Release \
@@ -80,7 +81,6 @@ LABEL org.opencontainers.image.licenses="MIT"
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates libssl3 \
     supervisor procps wget \
-    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Binaires compilés ─────────────────────────────────────────────
