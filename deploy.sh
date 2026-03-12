@@ -67,7 +67,7 @@ if find "$MODELS_DIR" -maxdepth 1 -name "*.gguf" | grep -q . 2>/dev/null; then
         SIZE=$(ls -lh "$f" | awk '{print $5}')
         printf "  • %s  (%s)\n" "$(basename "$f")" "$SIZE"
     done
-    printf "\n${C}Pour changer de modèle : ${W}./scripts/select-model.sh${N}\n\n"
+    printf "\n${C}Pour changer de modèle : ${W}make model${N}\n\n"
 else
     # Aucun modèle — lancer le sélecteur
     printf "\n${Y}"
