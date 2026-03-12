@@ -47,6 +47,7 @@ cp .env.example .env && nano .env
 make              # sans Open WebUI
 make webui        # avec Open WebUI
 make monitoring   # avec Netdata (monitoring temps réel)
+make webui-monitoring  # avec Open WebUI et Netdata
 ```
 
 > 💡 **Sélection du modèle automatique** — si aucun modèle n'est présent dans `./models/`,
