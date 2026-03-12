@@ -122,11 +122,12 @@ curl -sf --max-time 30 \
 
 # Parser et filtrer CPU uniquement
 python3 << 'PYEOF' > /tmp/tinai_gguf.txt
-import json, sys
+import json, sys, subprocess, re
 
 with open('/tmp/tinai_hf.json') as f:
     data = json.load(f)
 
+repo = data.get('id', '')
 siblings = data.get('siblings', [])
 exclude = ('f16','f32','bf16')
 
@@ -157,12 +158,29 @@ def ram(b):
     r = b * 1.15
     return f'{r/1_073_741_824:.1f} GB' if r > 1_073_741_824 else f'{r/1_048_576:.0f} MB'
 
-files = [(s['rfilename'], s.get('size',0))
+def get_size_from_header(repo, fname):
+    url = f"https://huggingface.co/{repo}/resolve/main/{fname}"
+    try:
+        r = subprocess.run(
+            ['curl', '-sI', '--max-time', '8', '-L', url],
+            capture_output=True, text=True, timeout=10
+        )
+        for line in r.stdout.splitlines():
+            if line.lower().startswith('content-length:'):
+                return int(line.split(':',1)[1].strip())
+    except Exception:
+        pass
+    return 0
+
+files = [(s['rfilename'], s.get('size', 0))
          for s in siblings
          if s['rfilename'].endswith('.gguf') and is_cpu(s['rfilename'])]
 files.sort(key=lambda x: order(x[0]))
 
 for fname, size in files:
+    # Si taille absente, récupérer via Content-Length header
+    if not size:
+        size = get_size_from_header(repo, fname)
     print(f"{fname}|{fmt(size)}|{ram(size)}")
 PYEOF
 
