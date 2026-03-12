@@ -1,8 +1,8 @@
 # TinAI – Test Report
 
-**Date   :** 2026-03-12 13:22 UTC
-**Run    :** [#91](https://github.com/MX10-AC2N/TinAI/actions/runs/23003981483)
-**Commit :** `818f8de6633286f426ffdaea6006298644d96fe6`
+**Date   :** 2026-03-12 16:19 UTC
+**Run    :** [#92](https://github.com/MX10-AC2N/TinAI/actions/runs/23012047511)
+**Commit :** `c3dff22558649f50d2961f7be2d70875059bbe2a`
 **Branch :** `main`
 
 ---
@@ -13,7 +13,7 @@
 
 ```
 NAME          IMAGE                               COMMAND                  SERVICE   CREATED         STATUS                            PORTS
-tinai         tinai:v5-amd64                      "/usr/local/bin/star…"   tinai     5 seconds ago   Up 5 seconds (healthy)            0.0.0.0:4200->4200/tcp, [::]:4200->4200/tcp
+tinai         tinai:v5-amd64                      "/usr/local/bin/star…"   tinai     6 seconds ago   Up 5 seconds (healthy)            0.0.0.0:4200->4200/tcp, [::]:4200->4200/tcp
 tinai-llama   ghcr.io/ggml-org/llama.cpp:server   "sh /llama-entrypoin…"   llama     6 seconds ago   Up 5 seconds (health: starting)   0.0.0.0:8081->8080/tcp, [::]:8081->8080/tcp
 ```
 
