@@ -7,7 +7,7 @@
 
 [![CI-TinAI](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-orange.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-5.0.0-blue)](https://github.com/MX10-AC2N/TinAI/releases)
+[![Version](https://img.shields.io/badge/version-5.1.0-blue)](https://github.com/MX10-AC2N/TinAI/releases)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io-2496ED?logo=docker)](https://ghcr.io/MX10-AC2N/tinai)
 [![OpenFang](https://img.shields.io/badge/OpenFang-pre--1.0-brightgreen)](https://openfang.sh)
 [![llama.cpp](https://img.shields.io/badge/llama.cpp-official-orange)](https://github.com/ggml-org/llama.cpp)
@@ -60,9 +60,10 @@ make monitoring   # avec dashboard monitoring
 
 | Service | URL | Description |
 |---|---|---|
-| 🌐 **Open WebUI** | http://localhost:3000 | Interface de chat *(optionnel)* |
+| 💬 **llama WebUI** | http://localhost:8081 | Interface de chat intégrée llama.cpp |
+| 🌐 **Open WebUI** | http://localhost:3000 | Interface de chat avancée *(optionnel)* |
 | 🤖 **OpenFang** | http://localhost:4200 | Dashboard agents IA autonomes |
-| ⚡ **llama-server** | http://localhost:8081 | API OpenAI-compatible |
+| ⚡ **llama API** | http://localhost:8081/v1 | API OpenAI-compatible |
 | 📊 **Monitor** | http://localhost:9000 | Dashboard monitoring *(optionnel)* |
 
 ---
@@ -93,9 +94,11 @@ make monitoring   # with monitoring dashboard
 
 | Service | URL | Description |
 |---|---|---|
-| 🌐 **Open WebUI** | http://localhost:3000 | Chat interface *(optional)* |
+| 💬 **llama WebUI** | http://localhost:8081 | Built-in llama.cpp chat interface |
+| 🌐 **Open WebUI** | http://localhost:3000 | Advanced chat interface *(optional)* |
 | 🤖 **OpenFang** | http://localhost:4200 | Autonomous AI agents dashboard |
-| ⚡ **llama-server** | http://localhost:8081 | OpenAI-compatible API |
+| ⚡ **llama API** | http://localhost:8081/v1 | OpenAI-compatible API |
+| 📊 **Monitor** | http://localhost:9000 | Monitoring dashboard *(optional)* |
 
 ---
 
@@ -229,6 +232,9 @@ Ce qu'il affiche en temps réel (rafraîchissement toutes les 5s) :
 > ```bash
 > docker compose --profile monitoring up -d
 > ```
+
+> ℹ️ **llama.cpp intègre sa propre WebUI** accessible sur le port 8081 (même port que l'API).  
+> Aucune configuration supplémentaire — elle est incluse dans l'image officielle.
 ---
 
 ## 🗂️ Utiliser son propre modèle / Bring your own model
