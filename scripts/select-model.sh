@@ -47,17 +47,17 @@ fi
 # ── Catalogue ─────────────────────────────────────────────────────
 # Format lignes : "Nom affiché|HF_REPO|RAM_min_GB"
 cat > /tmp/tinai_catalog.txt << 'CATALOG'
-Qwen3 1.7B|Qwen/Qwen3-1.7B-GGUF|2
-Qwen3 4B|Qwen/Qwen3-4B-GGUF|3
-Qwen3 8B|Qwen/Qwen3-8B-GGUF|6
-Phi-4 Mini Instruct (Microsoft)|microsoft/Phi-4-mini-instruct-gguf|3
-Phi-3 Mini 4K (Microsoft)|microsoft/Phi-3-mini-4k-instruct-gguf|3
-Mistral 7B Instruct v0.3|bartowski/Mistral-7B-Instruct-v0.3-GGUF|5
-Gemma 2 2B Instruct|bartowski/gemma-2-2b-it-GGUF|2
-Gemma 2 9B Instruct|bartowski/gemma-2-9b-it-GGUF|7
-Llama 3.2 3B Instruct|bartowski/Llama-3.2-3B-Instruct-GGUF|3
-Llama 3.1 8B Instruct|bartowski/Meta-Llama-3.1-8B-Instruct-GGUF|6
-SmolLM2 1.7B Instruct|bartowski/SmolLM2-1.7B-Instruct-GGUF|2
+Qwen3 1.7B (bartowski)|bartowski/Qwen3-1.7B-GGUF|2
+Qwen3 4B (bartowski)|bartowski/Qwen3-4B-GGUF|3
+Qwen3 8B (bartowski)|bartowski/Qwen3-8B-GGUF|6
+Phi-4 Mini Instruct (bartowski)|bartowski/Phi-4-mini-instruct-GGUF|3
+Phi-3 Mini 4K (bartowski)|bartowski/Phi-3-mini-4k-instruct-GGUF|3
+Mistral 7B Instruct v0.3 (bartowski)|bartowski/Mistral-7B-Instruct-v0.3-GGUF|5
+Gemma 2 2B Instruct (bartowski)|bartowski/gemma-2-2b-it-GGUF|2
+Gemma 2 9B Instruct (bartowski)|bartowski/gemma-2-9b-it-GGUF|7
+Llama 3.2 3B Instruct (bartowski)|bartowski/Llama-3.2-3B-Instruct-GGUF|3
+Llama 3.1 8B Instruct (bartowski)|bartowski/Meta-Llama-3.1-8B-Instruct-GGUF|6
+SmolLM2 1.7B Instruct (bartowski)|bartowski/SmolLM2-1.7B-Instruct-GGUF|2
 [Entrer un repo manuellement]|CUSTOM|0
 CATALOG
 
