@@ -189,32 +189,26 @@ services:
 
   # ── Monitoring (optionnel) ────────────────────────────────────────
   # Activer avec : make monitoring  ou  docker compose --profile monitoring up -d
-  netdata:
+  monitor:
     profiles: [monitoring]
-    image: netdata/netdata:stable
-    container_name: tinai-netdata
-    hostname: tinai-monitor
+    build:
+      context: ./monitoring
+      dockerfile: Dockerfile
+    image: tinai-monitor:latest
+    container_name: tinai-monitor
     restart: unless-stopped
     ports:
-      - "${PORT_NETDATA:-19999}:19999"
-    cap_add:
-      - SYS_PTRACE
-      - SYS_ADMIN
-    security_opt:
-      - apparmor:unconfined
+      - "${PORT_MONITOR:-9000}:8080"
     volumes:
-      - netdataconfig:/etc/netdata
-      - netdatalib:/var/lib/netdata
-      - netdatacache:/var/cache/netdata
-      - /etc/passwd:/host/etc/passwd:ro
-      - /etc/group:/host/etc/group:ro
-      - /etc/localtime:/etc/localtime:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-      - /etc/os-release:/host/etc/os-release:ro
+      - /etc/hostname:/host/etc/hostname:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      DOCKER_HOST: unix:///var/run/docker.sock
+      LLAMA_HOST: tinai-llama
+      LLAMA_PORT: "8080"
+    depends_on:
+      - tinai
     networks:
       - tinai-net
 
@@ -223,12 +217,7 @@ services:
 volumes:
   webui-data:
     driver: local
-  netdataconfig:
-    driver: local
-  netdatalib:
-    driver: local
-  netdatacache:
-    driver: local
+
 # ── Réseau ───────────────────────────────────────────────────────
 networks:
   tinai-net:
