@@ -1,89 +1,271 @@
-# TinAI
+<div align="center">
 
-Stack IA locale tournant sur CPU — ZimaBoard 832 ou tout SBC x86/ARM.
+# 🧠 TinAI
 
-```
-llama-server  (ghcr.io/ggml-org/llama.cpp:server)  :8081
-OpenFang      (ghcr.io/mx10-ac2n/tinai)             :4200
-Open WebUI    (ghcr.io/open-webui/open-webui)       :3000  (optionnel)
-```
+**Local AI stack — 100% offline, CPU-only, three focused Docker containers.**  
+**Stack IA locale — 100 % offline, CPU only, trois conteneurs Docker dédiés.**
 
-## Déploiement
+[![CI-TinAI](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MX10-AC2N/TinAI/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-orange.svg)](./LICENSE)
+[![Version](https://img.shields.io/badge/version-5.0.0-blue)](https://github.com/MX10-AC2N/TinAI/releases)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io-2496ED?logo=docker)](https://ghcr.io/MX10-AC2N/tinai)
+[![OpenFang](https://img.shields.io/badge/OpenFang-pre--1.0-brightgreen)](https://openfang.sh)
+[![llama.cpp](https://img.shields.io/badge/llama.cpp-official-orange)](https://github.com/ggml-org/llama.cpp)
+[![Open WebUI](https://img.shields.io/badge/Open_WebUI-optional-blue)](https://github.com/open-webui/open-webui)
+
+[🇫🇷 Français](#-démarrage-rapide) · [🇬🇧 English](#-quick-start-english)
+
+</div>
+
+---
+
+## 🖼️ Screenshots / Captures d'écran
+
+<div align="center">
+
+| Open WebUI Chat | OpenFang Dashboard | API Terminal |
+|---|---|---|
+| ![Open WebUI](docs/screenshots/webui-placeholder.png) | ![OpenFang](docs/screenshots/openfang-placeholder.png) | ![API](docs/screenshots/api-placeholder.png) |
+| *Interface de chat – Open WebUI (port 3000)* | *Agents autonomes (port 4200)* | *API OpenAI-compatible (port 8081)* |
+
+> 📸 *Placeholders — remplace ces images par des captures réelles dans `docs/screenshots/`*
+
+</div>
+
+---
+
+## 🇫🇷 Démarrage rapide
 
 ```bash
-# Cloner le repo
-git clone https://github.com/MX10-AC2N/TinAI.git
-cd TinAI
+# 1. Cloner le projet
+git clone https://github.com/MX10-AC2N/TinAI.git && cd TinAI
 
-# Déployer (sans Open WebUI)
-make
-
-# Déployer avec Open WebUI
-make webui
+# 2. Déployer
+make              # sans Open WebUI
+make webui        # avec Open WebUI
 ```
 
 À la fin du déploiement, si aucun modèle n'est présent, le sélecteur interactif
-se lance automatiquement pour choisir et télécharger un modèle depuis HuggingFace.
+se lance automatiquement — il interroge HuggingFace, affiche les tailles et la
+RAM nécessaire, télécharge ton choix et redémarre `llama-server`.
 
-## Commandes
+**Services disponibles :**
 
-| Commande      | Description                              |
-|---------------|------------------------------------------|
-| `make`        | Déployer sans Open WebUI                 |
-| `make webui`  | Déployer avec Open WebUI                 |
-| `make down`   | Arrêter tous les conteneurs              |
-| `make logs`   | Suivre les logs en direct                |
-| `make model`  | Changer de modèle (sélecteur interactif) |
+| Service | URL | Description |
+|---|---|---|
+| 🌐 **Open WebUI** | http://localhost:3000 | Interface de chat *(optionnel)* |
+| 🤖 **OpenFang** | http://localhost:4200 | Dashboard agents IA autonomes |
+| ⚡ **llama-server** | http://localhost:8081 | API OpenAI-compatible |
 
-## Changer de modèle
+---
+
+## 🇬🇧 Quick Start (English)
 
 ```bash
+# 1. Clone the project
+git clone https://github.com/MX10-AC2N/TinAI.git && cd TinAI
+
+# 2. Deploy
+make              # without Open WebUI
+make webui        # with Open WebUI
+```
+
+At the end of deployment, if no model is found, an interactive selector launches
+automatically — it queries HuggingFace live, shows file sizes and required RAM,
+downloads your choice and restarts `llama-server`.
+
+**Available services:**
+
+| Service | URL | Description |
+|---|---|---|
+| 🌐 **Open WebUI** | http://localhost:3000 | Chat interface *(optional)* |
+| 🤖 **OpenFang** | http://localhost:4200 | Autonomous AI agents dashboard |
+| ⚡ **llama-server** | http://localhost:8081 | OpenAI-compatible API |
+
+---
+
+## 🛠️ Commandes / Commands
+
+| Commande | Description |
+|---|---|
+| `make` | Déployer sans Open WebUI |
+| `make webui` | Déployer avec Open WebUI |
+| `make model` | Changer de modèle (sélecteur interactif) |
+| `make down` | Arrêter tous les conteneurs |
+| `make logs` | Suivre les logs en direct |
+
+---
+
+## 🔒 Sécurité / Security
+
+> ⚠️ **IMPORTANT — Avant toute exposition réseau / Before any network exposure:**
+
+```bash
+# FR: Génère des clés sécurisées dans .env
+# EN: Generate secure keys in .env
+TINAI_API_KEY=$(openssl rand -hex 32)
+WEBUI_SECRET_KEY=$(openssl rand -hex 32)
+```
+
+Ne déploie jamais avec les valeurs par défaut sur un réseau public.  
+*Never deploy with default values on a public network.*
+
+---
+
+## 📦 Exemples d'utilisation / Usage Examples
+
+### 💬 Chat API (cURL)
+
+```bash
+curl http://localhost:8081/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "tinai",
+    "messages": [
+      {"role": "system", "content": "Tu es un assistant utile."},
+      {"role": "user",   "content": "Explique Docker en 3 phrases."}
+    ]
+  }'
+```
+
+### 🐍 Python (OpenAI SDK)
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:8081/v1", api_key="sk-tinai")
+
+response = client.chat.completions.create(
+    model="tinai",
+    messages=[{"role": "user", "content": "What is llama.cpp?"}],
+)
+print(response.choices[0].message.content)
+```
+
+### 🟨 JavaScript / Node.js
+
+```javascript
+import OpenAI from "openai";
+
+const client = new OpenAI({ baseURL: "http://localhost:8081/v1", apiKey: "sk-tinai" });
+const chat = await client.chat.completions.create({
+  model: "tinai",
+  messages: [{ role: "user", content: "Bonjour !" }],
+});
+console.log(chat.choices[0].message.content);
+```
+
+### 🖥️ Intégration VS Code (Continue)
+
+Installe l'extension **Continue** puis ajoute dans `~/.continue/config.json` :
+
+```json
+{
+  "models": [{
+    "title": "TinAI (local)",
+    "provider": "openai",
+    "model": "tinai",
+    "apiBase": "http://localhost:8081/v1",
+    "apiKey": "sk-tinai"
+  }]
+}
+```
+
+---
+
+## ⚙️ Configuration `.env`
+
+| Variable | Défaut | Description |
+|---|---|---|
+| `LLAMA_HF_REPO` | `unsloth/Qwen3-1.7B-GGUF` | Repo HuggingFace du modèle |
+| `LLAMA_HF_FILE` | `Qwen3-1.7B-Q5_K_M.gguf` | Fichier GGUF à charger |
+| `LLAMA_CTX_SIZE` | `8192` | Contexte en tokens |
+| `LLAMA_THREADS` | `4` | Threads CPU (= cœurs physiques) |
+| `MODELS_DIR` | `./models` | Dossier des modèles sur l'hôte |
+| `PORT_LLAMA` | `8081` | Port llama-server |
+| `PORT_OPENFANG` | `4200` | Port OpenFang |
+| `PORT_WEBUI` | `3000` | Port Open WebUI |
+| `WEBUI_SECRET_KEY` | `tinai-secret-change-me` | ⚠️ **À changer !** |
+
+> 💡 Le modèle se choisit interactivement via `make model` — plus besoin d'éditer `.env` à la main.
+
+---
+
+## 🗂️ Utiliser son propre modèle / Bring your own model
+
+```bash
+# Place le fichier dans ./models/
+cp ~/Downloads/mon-modele.gguf ./models/
+
+# Lance le sélecteur pour pointer dessus
 make model
+# → choisis "Entrer un repo manuellement" ou laisse le sélecteur détecter le fichier
+
+# Ou édite .env directement
+echo "LLAMA_HF_FILE=mon-modele.gguf" >> .env
+docker compose restart llama
 ```
 
-Le sélecteur interroge l'API HuggingFace en temps réel, filtre les modèles
-CPU-compatibles (exclut F16/F32/BF16), affiche les tailles et la RAM nécessaire,
-puis télécharge et redémarre `llama-server` automatiquement.
+---
 
-## Configuration
-
-Copier `.env.example` en `.env` et ajuster si besoin :
-
-```bash
-cp .env.example .env
-```
-
-Variables principales :
-
-| Variable         | Défaut                        | Description                  |
-|------------------|-------------------------------|------------------------------|
-| `LLAMA_HF_REPO`  | `unsloth/Qwen3-1.7B-GGUF`    | Repo HuggingFace du modèle   |
-| `LLAMA_HF_FILE`  | `Qwen3-1.7B-Q5_K_M.gguf`     | Fichier GGUF à charger       |
-| `MODELS_DIR`     | `./models`                    | Dossier des modèles sur l'hôte |
-| `PORT_LLAMA`     | `8081`                        | Port llama-server             |
-| `PORT_OPENFANG`  | `4200`                        | Port OpenFang                 |
-| `PORT_WEBUI`     | `3000`                        | Port Open WebUI               |
-
-## Prérequis
-
-- Docker + Docker Compose
-- 4 GB RAM minimum (8 GB recommandé)
-- `python3` (pour le sélecteur de modèle)
-- `make`
-
-## Architecture
+## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────┐
-│  tinai-net (bridge)                     │
-│                                         │
-│  tinai-llama  llama-server  :8080       │
-│  tinai        OpenFang      :4200       │
-│  tinai-webui  Open WebUI    :3000  (*)  │
-└─────────────────────────────────────────┘
-(*) profil optionnel : make webui
+┌──────────────────────────┐   ┌──────────────────────────┐   ┌──────────────────────────┐
+│  tinai-llama             │   │  tinai                   │   │  tinai-webui  (optionnel)│
+│  llama.cpp official img  │   │  Dockerfile              │   │  Open WebUI              │
+│                          │   │                          │   │                          │
+│  llama-server  :8080 ────┼───►  OpenFang    :4200       │   │  Chat UI       :3000     │
+│  (modèle GGUF via HF)    │   │  (Rust agent OS)         │◄──┤  (profile webui)         │
+└──────────────────────────┘   └──────────────────────────┘   └──────────────────────────┘
+        port 8081 (hôte)               port 4200 (hôte)               port 3000 (hôte)
+                              tinai-net (bridge)
 ```
 
-## Matériel testé
+**Pourquoi trois conteneurs ?**  
+Chaque composant a son cycle de vie indépendant. `llama-server` peut redémarrer
+pour changer de modèle sans toucher à OpenFang ni à Open WebUI.
 
-- ZimaBoard 832 (Intel N3450, 8 GB RAM, CasaOS)
+---
+
+## 📋 Configuration requise / Requirements
+
+| | Minimum | Recommandé |
+|---|---|---|
+| **RAM** | 4 GB | 8 GB |
+| **CPU** | x86_64 / ARM64 | 4+ cœurs |
+| **Disque** | 5 GB | 10 GB |
+| **Docker** | 24.0+ | latest |
+| **OS** | Linux, macOS, Windows (WSL2) | Linux |
+
+> 🍓 Compatible Raspberry Pi 4/5 (ARM64), Apple Silicon, ZimaBoard 832
+
+---
+
+## 🚀 CI / Pipeline
+
+**3 jobs automatiques à chaque push sur `main` :**
+
+1. **🔒 Audit sécurité** — ShellCheck sur tous les scripts, secrets hardcodés, ports via variables
+2. **🧪 Build & Test** — Matrice `amd64` + `arm64` en parallèle, démarrage des conteneurs, tests des services
+3. **📋 Rapport consolidé** — [`TEST-REPORT.md`](./TEST-REPORT.md) committé automatiquement
+
+---
+
+## 🤝 Contribuer / Contributing
+
+Voir [CONTRIBUTING.md](./CONTRIBUTING.md) · See [CONTRIBUTING.md](./CONTRIBUTING.md)
+
+---
+
+## 📄 Licence / License
+
+[MIT](./LICENSE) — MX10-AC2N
+
+---
+
+<div align="center">
+
+**Built with ❤️ using [llama.cpp](https://github.com/ggml-org/llama.cpp) · [Open WebUI](https://github.com/open-webui/open-webui) · [OpenFang](https://openfang.sh)**
+
+</div>
