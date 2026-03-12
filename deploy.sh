@@ -32,13 +32,19 @@ if [ ! -f .env ]; then
     cp .env.example .env || die ".env.example introuvable"
 fi
 
-# ── Profil optionnel (--profile webui) ────────────────────────────
+# ── Profils optionnels (cumulables : --profile webui --profile monitoring) ─
 PROFILES=""
+SKIP_NEXT=0
 for arg in "$@"; do
-    case "$arg" in
-        --profile=*) PROFILES="--profile ${arg#--profile=}" ;;
-        --profile)   shift; PROFILES="--profile $1" ;;
-    esac
+    if [ "$SKIP_NEXT" = "1" ]; then
+        PROFILES="$PROFILES --profile $arg"
+        SKIP_NEXT=0
+    else
+        case "$arg" in
+            --profile=*) PROFILES="$PROFILES --profile ${arg#--profile=}" ;;
+            --profile)   SKIP_NEXT=1 ;;
+        esac
+    fi
 done
 
 # ── Banner ────────────────────────────────────────────────────────
