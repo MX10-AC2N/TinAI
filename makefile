@@ -1,12 +1,14 @@
 # TinAI – Makefile
 #
-#   make           déploiement sans Open WebUI
-#   make webui     déploiement avec Open WebUI  
-#   make down      arrêt
-#   make logs      logs en direct
-#   make model     sélecteur de modèle
+#   make                    déploiement standard
+#   make webui              + Open WebUI
+#   make monitoring         + Netdata
+#   make webui-monitoring   + Open WebUI + Netdata
+#   make down               arrêt
+#   make logs               logs en direct
+#   make model              changer de modèle
 
-.PHONY: all deploy webui down logs model monitoring monitoring-down
+.PHONY: all deploy webui monitoring webui-monitoring down logs model
 
 all: deploy
 
@@ -18,15 +20,16 @@ webui:
 	chmod +x deploy.sh scripts/*.sh 2>/dev/null || true
 	bash deploy.sh --profile webui
 
-down:
-	docker compose down
-
 monitoring:
 	chmod +x deploy.sh scripts/*.sh 2>/dev/null || true
 	bash deploy.sh --profile monitoring
 
-monitoring-down:
-	docker compose --profile monitoring down
+webui-monitoring:
+	chmod +x deploy.sh scripts/*.sh 2>/dev/null || true
+	bash deploy.sh --profile webui --profile monitoring
+
+down:
+	docker compose --profile webui --profile monitoring down
 
 logs:
 	docker compose logs -f
