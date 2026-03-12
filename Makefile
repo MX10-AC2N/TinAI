@@ -8,7 +8,7 @@
 #   make logs               logs en direct
 #   make model              changer de modèle
 
-.PHONY: all deploy webui monitoring webui-monitoring down logs model
+.PHONY: all deploy webui monitoring webui-monitoring down monitoring-down logs model
 
 all: deploy
 
@@ -29,6 +29,9 @@ webui-monitoring:
 	bash deploy.sh --profile webui --profile monitoring
 
 down:
+	docker compose --profile webui --profile monitoring down
+
+monitoring-down:
 	docker compose --profile webui --profile monitoring down
 
 logs:
