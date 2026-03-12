@@ -162,12 +162,19 @@ def get_size_from_header(repo, fname):
     url = f"https://huggingface.co/{repo}/resolve/main/{fname}"
     try:
         r = subprocess.run(
-            ['curl', '-sI', '--max-time', '8', '-L', url],
-            capture_output=True, text=True, timeout=10
+            ['curl', '-sI', '--max-time', '10', '-L',
+             '--user-agent', 'Mozilla/5.0', url],
+            capture_output=True, text=True, timeout=15
         )
+        # HF redirige vers CDN — prendre le DERNIER Content-Length du suivi de redirection
+        size = 0
         for line in r.stdout.splitlines():
             if line.lower().startswith('content-length:'):
-                return int(line.split(':',1)[1].strip())
+                try:
+                    size = int(line.split(':',1)[1].strip())
+                except ValueError:
+                    pass
+        return size
     except Exception:
         pass
     return 0
