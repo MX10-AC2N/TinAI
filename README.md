@@ -102,9 +102,10 @@ make monitoring   # with Netdata (real-time monitoring)
 
 | Commande | Description |
 |---|---|
-| `make` | Déployer sans Open WebUI |
-| `make webui` | Déployer avec Open WebUI |
-| `make monitoring` | Déployer avec Netdata (monitoring temps réel) |
+| `make` | Déployer la stack de base |
+| `make webui` | + Open WebUI (chat interface) |
+| `make monitoring` | + Netdata (monitoring temps réel) |
+| `make webui-monitoring` | + Open WebUI + Netdata |
 | `make model` | Changer de modèle (sélecteur interactif) |
 | `make down` | Arrêter tous les conteneurs |
 | `make logs` | Suivre les logs en direct |
