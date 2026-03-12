@@ -265,12 +265,17 @@ for fname, size in files:
 
 # ── Menu de sélection du repo ─────────────────────────────────────
 select_repo() {
+    # Construire le catalogue dans un fichier tmp (évite les subshells/pipes)
+    CATALOG_FILE=$(mktemp /tmp/tinai_catalog.XXXXXX)
+    echo "$CATALOG" | grep -v "^$" > "$CATALOG_FILE"
+    TOTAL=$(wc -l < "$CATALOG_FILE" | tr -d ' ')
+
     printf "${W}Modèles disponibles :${N}\n\n"
     printf "  ${C}%-3s  %-40s  %s${N}\n" "N°" "Modèle" "RAM min (Q4_K_M)"
     printf "  %s\n" "──────────────────────────────────────────────────────────"
 
     i=1
-    echo "$CATALOG" | grep -v "^$" | while IFS='|' read -r NAME REPO RAM_MIN; do
+    while IFS='|' read -r NAME REPO RAM_MIN; do
         if [ "$REPO" = "CUSTOM" ]; then
             printf "  ${Y}%2d)${N}  %s\n" "$i" "$NAME"
         else
@@ -281,16 +286,18 @@ select_repo() {
             fi
         fi
         i=$((i+1))
-    done
+    done < "$CATALOG_FILE"
 
-    printf "\n${W}Choix [1-%d] : ${N}" "$(echo "$CATALOG" | grep -c -v "^$")"
-    read -r CHOICE
+    printf "\n${W}Choix [1-%d] : ${N}" "$TOTAL"
+    read -r CHOICE </dev/tty
 
-    i=1
-    echo "$CATALOG" | grep -v "^$" | while IFS='|' read -r NAME REPO RAM_MIN; do
-        [ "$i" = "$CHOICE" ] && echo "$REPO|$NAME"
-        i=$((i+1))
-    done
+    # Récupérer la ligne choisie
+    RESULT=$(sed -n "${CHOICE}p" "$CATALOG_FILE")
+    rm -f "$CATALOG_FILE"
+
+    REPO=$(echo "$RESULT" | cut -d'|' -f2)
+    NAME=$(echo "$RESULT" | cut -d'|' -f1)
+    echo "$REPO|$NAME"
 }
 
 # ── Menu de sélection du fichier GGUF ────────────────────────────
@@ -298,9 +305,12 @@ select_file() {
     HF_REPO="$1"
     GGUF_LIST="$2"
 
-    COUNT=$(echo "$GGUF_LIST" | grep -c -v "^$" || echo 0)
+    GGUF_FILE=$(mktemp /tmp/tinai_gguf.XXXXXX)
+    echo "$GGUF_LIST" | grep -v "^$" > "$GGUF_FILE"
+    COUNT=$(wc -l < "$GGUF_FILE" | tr -d ' ')
 
     if [ "$COUNT" -eq 0 ]; then
+        rm -f "$GGUF_FILE"
         die "Aucun fichier .gguf CPU-compatible trouvé dans ${HF_REPO}"
     fi
 
@@ -311,9 +321,8 @@ select_file() {
     printf "  %s\n" "─────────────────────────────────────────────────────────────────────────────────"
 
     i=1
-    echo "$GGUF_LIST" | grep -v "^$" | while IFS='|' read -r FNAME SIZE_B SIZE_FMT RAM_FMT; do
+    while IFS='|' read -r FNAME SIZE_B SIZE_FMT RAM_FMT; do
         DESC=$(quant_desc "$FNAME")
-        # Mettre en évidence les recommandés
         case "$FNAME" in
             *Q4_K_M* | *q4_k_m*) MARK="${G}" ;;
             *Q5_K_M* | *q5_k_m*) MARK="${G}" ;;
@@ -322,17 +331,16 @@ select_file() {
         printf "  ${MARK}%2d)${N}  %-48s  ${C}%7s${N}  ${Y}%10s${N}  %s\n" \
             "$i" "$FNAME" "$SIZE_FMT" "$RAM_FMT" "$DESC"
         i=$((i+1))
-    done
+    done < "$GGUF_FILE"
 
     printf "\n${W}Choix [1-%d] : ${N}" "$COUNT"
-    read -r FCHOICE
+    read -r FCHOICE </dev/tty
 
-    i=1
-    echo "$GGUF_LIST" | grep -v "^$" | while IFS='|' read -r FNAME SIZE_B SIZE_FMT RAM_FMT; do
-        [ "$i" = "$FCHOICE" ] && echo "$FNAME|$SIZE_B|$SIZE_FMT|$RAM_FMT"
-        i=$((i+1))
-    done
+    RESULT=$(sed -n "${FCHOICE}p" "$GGUF_FILE")
+    rm -f "$GGUF_FILE"
+    echo "$RESULT"
 }
+
 
 # ── Téléchargement ────────────────────────────────────────────────
 download_model() {
@@ -348,7 +356,7 @@ download_model() {
         EXISTING=$(ls -lh "$DEST" | awk '{print $5}')
         printf "\n${Y}Fichier déjà présent : %s (%s)${N}\n" "$DEST" "$EXISTING"
         printf "Retélécharger ? [o/N] : "
-        read -r REDOWNLOAD
+        read -r REDOWNLOAD </dev/tty
         case "$REDOWNLOAD" in [oOyY]) ;; *) ok "Téléchargement ignoré"; return 0 ;; esac
     fi
 
@@ -451,7 +459,7 @@ main() {
     printf "  Dest    : %s/%s\n" "$MODELS_DIR" "$HF_FILE"
     printf "${W}══════════════════════════════════════════════${N}\n"
     printf "\nContinuer ? [O/n] : "
-    read -r CONFIRM
+    read -r CONFIRM </dev/tty
     case "$CONFIRM" in [nN]) echo "Annulé."; exit 0 ;; esac
 
     # 5. Téléchargement
@@ -459,12 +467,12 @@ main() {
 
     # 6. Mise à jour .env
     printf "\nMettre à jour .env avec ce modèle ? [O/n] : "
-    read -r UPDATE_ENV_Q
+    read -r UPDATE_ENV_Q </dev/tty
     case "$UPDATE_ENV_Q" in [nN]) ;; *) update_env "$HF_REPO" "$HF_FILE" ;; esac
 
     # 7. Redémarrer le conteneur llama
     printf "\nRedémarrer le conteneur llama maintenant ? [O/n] : "
-    read -r RESTART
+    read -r RESTART </dev/tty
     case "$RESTART" in
         [nN]) ;;
         *)
