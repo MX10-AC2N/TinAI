@@ -40,14 +40,21 @@
 # 1. Cloner le projet
 git clone https://github.com/MX10-AC2N/TinAI.git && cd TinAI
 
-# 2. Déployer
+# 2. (Optionnel) Personnaliser les ports, la RAM limite, la clé API…
+cp .env.example .env && nano .env
+
+# 3. Déployer
 make              # sans Open WebUI
 make webui        # avec Open WebUI
+make monitoring   # avec Netdata (monitoring temps réel)
 ```
 
-À la fin du déploiement, si aucun modèle n'est présent, le sélecteur interactif
-se lance automatiquement — il interroge HuggingFace, affiche les tailles et la
-RAM nécessaire, télécharge ton choix et redémarre `llama-server`.
+> 💡 **Sélection du modèle automatique** — si aucun modèle n'est présent dans `./models/`,
+> le sélecteur interactif se lance à la fin du déploiement : il interroge HuggingFace en
+> temps réel, filtre les modèles CPU-compatibles, affiche les tailles et la RAM nécessaire,
+> télécharge ton choix et redémarre `llama-server` automatiquement.
+>
+> Pour changer de modèle plus tard : `make model`
 
 **Services disponibles :**
 
@@ -65,14 +72,21 @@ RAM nécessaire, télécharge ton choix et redémarre `llama-server`.
 # 1. Clone the project
 git clone https://github.com/MX10-AC2N/TinAI.git && cd TinAI
 
-# 2. Deploy
+# 2. (Optional) Customize ports, RAM limits, API key…
+cp .env.example .env && nano .env
+
+# 3. Deploy
 make              # without Open WebUI
 make webui        # with Open WebUI
+make monitoring   # with Netdata (real-time monitoring)
 ```
 
-At the end of deployment, if no model is found, an interactive selector launches
-automatically — it queries HuggingFace live, shows file sizes and required RAM,
-downloads your choice and restarts `llama-server`.
+> 💡 **Automatic model selection** — if no model is present in `./models/`, an interactive
+> selector launches at the end of deployment: it queries HuggingFace live, filters
+> CPU-compatible models, shows sizes and required RAM, downloads your choice and
+> restarts `llama-server` automatically.
+>
+> To change model later: `make model`
 
 **Available services:**
 
@@ -90,6 +104,7 @@ downloads your choice and restarts `llama-server`.
 |---|---|
 | `make` | Déployer sans Open WebUI |
 | `make webui` | Déployer avec Open WebUI |
+| `make monitoring` | Déployer avec Netdata (monitoring temps réel) |
 | `make model` | Changer de modèle (sélecteur interactif) |
 | `make down` | Arrêter tous les conteneurs |
 | `make logs` | Suivre les logs en direct |
@@ -188,6 +203,28 @@ Installe l'extension **Continue** puis ajoute dans `~/.continue/config.json` :
 | `WEBUI_SECRET_KEY` | `tinai-secret-change-me` | ⚠️ **À changer !** |
 
 > 💡 Le modèle se choisit interactivement via `make model` — plus besoin d'éditer `.env` à la main.
+
+
+---
+
+## 📊 Monitoring (optionnel)
+
+```bash
+make monitoring          # démarre Netdata avec la stack
+make monitoring-down     # arrête tout y compris Netdata
+```
+
+Netdata est disponible sur **http://localhost:19999** — zéro configuration requise.  
+Il détecte automatiquement les conteneurs Docker et affiche :
+
+- CPU, RAM, disque, réseau en temps réel
+- Métriques par conteneur (`tinai-llama`, `tinai`, `tinai-webui`)
+- Alertes automatiques si un conteneur consomme trop de ressources
+
+> 💡 Netdata peut aussi être activé indépendamment sur une stack déjà démarrée :
+> ```bash
+> docker compose --profile monitoring up -d
+> ```
 
 ---
 
