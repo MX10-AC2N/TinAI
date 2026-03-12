@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TinAI Monitor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Space+Grotesk:wght@300;500;700&display=swap');
+
+  :root {
+    --bg:        #0a0c10;
+    --surface:   #111318;
+    --border:    #1e2230;
+    --accent:    #00d4aa;
+    --accent2:   #7c6af7;
+    --warn:      #f0a030;
+    --danger:    #e05560;
+    --text:      #c8d0e0;
+    --muted:     #4a5268;
+    --up:        #00d4aa;
+    --down:      #e05560;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  /* Subtle grid background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .logo h1 {
+    font-size: 20px; font-weight: 700; letter-spacing: -0.5px;
+    color: #fff;
+  }
+  .logo span { color: var(--accent); }
+  .refresh-info {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--muted);
+  }
+  #last-update { color: var(--accent); }
+
+  /* Grid layout */
+  .grid-top {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .grid-mid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .grid-bottom {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: #2a3045; }
+  .card-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .card-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px; font-weight: 600; color: #fff;
+    line-height: 1;
+  }
+  .card-value .unit {
+    font-size: 13px; color: var(--muted); margin-left: 4px;
+  }
+  .card-sub {
+    font-size: 11px; color: var(--muted); margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Progress bar */
+  .bar-wrap {
+    height: 4px; background: var(--border);
+    border-radius: 2px; margin-top: 10px; overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 2px;
+    transition: width 0.6s ease;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+  .bar-fill.warn { background: var(--warn); }
+  .bar-fill.danger { background: var(--danger); }
+
+  /* Containers */
+  .containers-card { padding: 18px 20px; }
+  .containers-card .card-label { margin-bottom: 14px; }
+  .container-row {
+    display: flex; align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .container-row:last-child { border-bottom: none; }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 12px; flex-shrink: 0;
+    box-shadow: 0 0 6px currentColor;
+  }
+  .dot.up   { background: var(--up);   color: var(--up); }
+  .dot.down { background: var(--down); color: var(--down); }
+  .dot.starting { background: var(--warn); color: var(--warn); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
+  .cname {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; color: #fff; flex: 1;
+  }
+  .cstatus {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+    padding: 2px 8px; border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .cstatus.up     { color: var(--up);   background: rgba(0,212,170,0.1); }
+  .cstatus.down   { color: var(--down); background: rgba(224,85,96,0.1); }
+  .cstatus.starting { color: var(--warn); background: rgba(240,160,48,0.1); }
+  .cmem {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--muted);
+    min-width: 70px; text-align: right; margin-right: 12px;
+  }
+
+  /* Llama metrics */
+  .llama-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 12px; margin-top: 4px;
+  }
+  .metric-item .label {
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;
+  }
+  .metric-item .val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px; color: #fff; font-weight: 600;
+  }
+  .metric-item .val .u { font-size: 11px; color: var(--muted); }
+
+  /* Logs */
+  .logs-card { padding: 18px 20px; }
+  #log-box {
+    background: #07090d;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    height: 200px;
+    overflow-y: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    line-height: 1.7;
+    margin-top: 12px;
+  }
+  .log-line { color: var(--muted); }
+  .log-line.info  { color: #6ab0f5; }
+  .log-line.warn  { color: var(--warn); }
+  .log-line.error { color: var(--danger); }
+  .log-line .ts   { color: #3a4255; margin-right: 8px; }
+
+  /* Model badge */
+  .model-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(124,106,247,0.12);
+    border: 1px solid rgba(124,106,247,0.25);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: var(--accent2);
+    margin-top: 8px;
+  }
+
+  /* Error state */
+  .error-state { color: var(--muted); font-size: 13px; }
+  .spinner {
+    display: inline-block; width: 10px; height: 10px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 700px) {
+    .grid-top { grid-template-columns: 1fr 1fr; }
+    .grid-mid  { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🧠</div>
+      <h1>Tin<span>AI</span> Monitor</h1>
+    </div>
+    <div class="refresh-info">
+      mise à jour toutes les 5s · <span id="last-update">—</span>
+    </div>
+  </header>
+
+  <!-- Row 1 : métriques système -->
+  <div class="grid-top">
+    <div class="card">
+      <div class="card-label">CPU</div>
+      <div class="card-value" id="cpu-val">—<span class="unit">%</span></div>
+      <div class="bar-wrap"><div class="bar-fill" id="cpu-bar" style="width:0%"></div></div>
+      <div class="card-sub" id="cpu-cores">— cœurs</div>
+    </div>
+    <div class="card">
+      <div class="card-label">RAM utilisée</div>
+      <div class="card-value" id="mem-val">—<span class="unit">GB</span></div>
+      <div class="bar-wrap"><div class="bar-fill" id="mem-bar" style="width:0%"></div></div>
+      <div class="card-sub" id="mem-sub">— / — GB</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Disque</div>
+      <div class="card-value" id="disk-val">—<span class="unit">%</span></div>
+      <div class="bar-wrap"><div class="bar-fill" id="disk-bar" style="width:0%"></div></div>
+      <div class="card-sub" id="disk-sub">— utilisé</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Uptime</div>
+      <div class="card-value" id="uptime-val" style="font-size:20px">—</div>
+      <div class="card-sub" id="hostname-val">—</div>
+    </div>
+  </div>
+
+  <!-- Row 2 : conteneurs + llama -->
+  <div class="grid-mid">
+    <div class="card containers-card">
+      <div class="card-label">Conteneurs</div>
+      <div id="containers-list"><span class="spinner"></span> chargement…</div>
+    </div>
+    <div class="card">
+      <div class="card-label">llama-server</div>
+      <div id="llama-status">
+        <span class="spinner"></span> connexion…
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 3 : logs -->
+  <div class="grid-bottom">
+    <div class="card logs-card">
+      <div class="card-label">Logs récents — tinai-llama</div>
+      <div id="log-box"><span class="log-line">En attente des logs…</span></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const LLAMA_URL  = `${location.protocol}//${location.hostname}:8081`;
+const PROXY_URL  = `${location.protocol}//${location.hostname}:${location.port}`;
+
+// ── Helpers ──────────────────────────────────────────────────────
+function fmt(n, dec=1) { return Number(n).toFixed(dec); }
+function fmtGB(bytes) { return fmt(bytes / 1073741824) + ' GB'; }
+function fmtMB(bytes) { return fmt(bytes / 1048576, 0) + ' MB'; }
+function barClass(pct) { return pct > 90 ? 'danger' : pct > 70 ? 'warn' : ''; }
+
+function setBar(id, pct) {
+  const el = document.getElementById(id);
+  el.style.width = Math.min(pct, 100) + '%';
+  el.className = 'bar-fill ' + barClass(pct);
+}
+
+function now() {
+  return new Date().toLocaleTimeString('fr-FR');
+}
+
+// ── System stats (via /api/system proxy dans nginx) ───────────────
+async function fetchSystem() {
+  try {
+    const r = await fetch('/api/system');
+    const d = await r.json();
+
+    // CPU
+    document.getElementById('cpu-val').innerHTML = `${fmt(d.cpu_pct)}<span class="unit">%</span>`;
+    setBar('cpu-bar', d.cpu_pct);
+    document.getElementById('cpu-cores').textContent = `${d.cpu_count} cœurs · load ${d.load1}`;
+
+    // RAM
+    const memPct = (d.mem_used / d.mem_total * 100);
+    document.getElementById('mem-val').innerHTML = `${fmt(d.mem_used/1073741824)}<span class="unit">GB</span>`;
+    setBar('mem-bar', memPct);
+    document.getElementById('mem-sub').textContent = `${fmtGB(d.mem_used)} / ${fmtGB(d.mem_total)}`;
+
+    // Disk
+    document.getElementById('disk-val').innerHTML = `${fmt(d.disk_pct)}<span class="unit">%</span>`;
+    setBar('disk-bar', d.disk_pct);
+    document.getElementById('disk-sub').textContent = `${fmtGB(d.disk_used)} utilisé sur ${fmtGB(d.disk_total)}`;
+
+    // Uptime
+    const u = d.uptime_s;
+    const h = Math.floor(u/3600), m = Math.floor((u%3600)/60);
+    document.getElementById('uptime-val').textContent = `${h}h ${m}m`;
+    document.getElementById('hostname-val').textContent = d.hostname;
+
+  } catch(e) {
+    document.getElementById('cpu-val').textContent = 'ERR';
+  }
+}
+
+// ── Containers (via /api/containers proxy) ────────────────────────
+async function fetchContainers() {
+  const el = document.getElementById('containers-list');
+  try {
+    const r = await fetch('/api/containers');
+    const containers = await r.json();
+
+    const targets = ['tinai-llama','tinai','tinai-webui','tinai-netdata'];
+    let html = '';
+
+    for (const name of targets) {
+      const c = containers.find(x => x.name === name);
+      if (!c) continue;
+      const stateClass = c.state === 'running' ? 'up'
+                       : c.state === 'starting' ? 'starting' : 'down';
+      const label = c.state === 'running' ? 'UP'
+                  : c.state === 'starting' ? 'STARTING' : 'DOWN';
+      html += `
+        <div class="container-row">
+          <div class="dot ${stateClass}"></div>
+          <div class="cname">${name}</div>
+          <div class="cmem">${c.mem_mb ? c.mem_mb + ' MB' : ''}</div>
+          <div class="cstatus ${stateClass}">${label}</div>
+        </div>`;
+    }
+    el.innerHTML = html || '<span class="error-state">Aucun conteneur trouvé</span>';
+  } catch(e) {
+    el.innerHTML = '<span class="error-state">Docker socket inaccessible</span>';
+  }
+}
+
+// ── llama-server (/api/llama proxy) ───────────────────────────────
+async function fetchLlama() {
+  const el = document.getElementById('llama-status');
+  try {
+    const [health, models] = await Promise.all([
+      fetch('/api/llama/health').then(r => r.json()),
+      fetch('/api/llama/models').then(r => r.json()).catch(() => ({data:[]}))
+    ]);
+
+    const modelName = models.data?.[0]?.id ?? '—';
+    const slotsFree = health.slots_idle ?? '—';
+    const slotsBusy = health.slots_processing ?? '—';
+    const status = health.status ?? 'unknown';
+    const statusColor = status === 'ok' ? 'var(--up)' : 'var(--warn)';
+
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <div class="dot ${status === 'ok' ? 'up' : 'starting'}"></div>
+        <span style="color:#fff;font-weight:600">${status.toUpperCase()}</span>
+      </div>
+      <div class="model-badge">🤖 ${modelName}</div>
+      <div class="llama-grid" style="margin-top:14px">
+        <div class="metric-item">
+          <div class="label">Slots libres</div>
+          <div class="val">${slotsFree}<span class="u"> slots</span></div>
+        </div>
+        <div class="metric-item">
+          <div class="label">En cours</div>
+          <div class="val">${slotsBusy}<span class="u"> req</span></div>
+        </div>
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="dot down"></div>
+        <span style="color:var(--down);font-weight:600">HORS LIGNE</span>
+      </div>
+      <div class="card-sub" style="margin-top:8px">En attente d'un modèle…</div>`;
+  }
+}
+
+// ── Logs (via /api/logs proxy) ────────────────────────────────────
+let lastLogTs = 0;
+async function fetchLogs() {
+  const box = document.getElementById('log-box');
+  try {
+    const r = await fetch('/api/logs');
+    const lines = await r.json();
+    if (!lines.length) return;
+
+    box.innerHTML = lines.map(l => {
+      const cls = l.includes('ERROR') || l.includes('WARN') ? 'warn'
+                : l.includes('INFO') ? 'info' : '';
+      const ts = l.match(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/)?.[0]?.slice(11,19) ?? '';
+      const msg = l.replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z\s+/, '');
+      return `<div class="log-line ${cls}"><span class="ts">${ts}</span>${msg}</div>`;
+    }).join('');
+    box.scrollTop = box.scrollHeight;
+  } catch(e) {
+    // silencieux
+  }
+}
+
+// ── Tick ─────────────────────────────────────────────────────────
+async function tick() {
+  await Promise.allSettled([
+    fetchSystem(),
+    fetchContainers(),
+    fetchLlama(),
+    fetchLogs()
+  ]);
+  document.getElementById('last-update').textContent = now();
+}
+
+tick();
+setInterval(tick, 5000);
+</script>
+</body>
+</html>
