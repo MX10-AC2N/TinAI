@@ -13,6 +13,9 @@ RUN rm -f /etc/nginx/sites-enabled/default
 # API
 COPY api.py /app/api.py
 
+# Créer le groupe docker avec le même GID que l'hôte (999 sur la plupart des Linux)
+RUN groupadd -g 999 docker 2>/dev/null || true && usermod -aG docker root
+
 # Script de démarrage (nginx + api.py en parallèle)
 RUN printf '#!/bin/sh\nnginx\npython3 /app/api.py\n' > /start.sh && chmod +x /start.sh
 
