@@ -1,34 +1,36 @@
 # ══════════════════════════════════════════════════════════════════
 #  TinAI – Makefile
-#  Remplace docker compose up -d
 #
 #  Usage :
-#    make          → déploiement standard
+#    make          → déploiement standard (sans Open WebUI)
 #    make webui    → avec Open WebUI
 #    make down     → arrêt
 #    make logs     → logs en direct
 #    make model    → sélecteur de modèle
 # ══════════════════════════════════════════════════════════════════
 
+SHELL := /bin/bash
+# Forcer l'exécution depuis le répertoire du Makefile
+MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
 .PHONY: all deploy webui down logs model permissions
 
-# Corriger les permissions au début de chaque cible
 permissions:
-	@chmod +x deploy.sh scripts/*.sh 2>/dev/null || true
+	@chmod +x $(MAKEFILE_DIR)deploy.sh $(MAKEFILE_DIR)scripts/*.sh 2>/dev/null || true
 
 all: deploy
 
 deploy: permissions
-	@bash deploy.sh
+	@cd $(MAKEFILE_DIR) && bash deploy.sh
 
 webui: permissions
-	@bash deploy.sh --profile webui
+	@cd $(MAKEFILE_DIR) && bash deploy.sh --profile webui
 
 down:
-	docker compose down
+	@cd $(MAKEFILE_DIR) && docker compose down
 
 logs:
-	docker compose logs -f
+	@cd $(MAKEFILE_DIR) && docker compose logs -f
 
 model: permissions
-	@bash scripts/select-model.sh
+	@cd $(MAKEFILE_DIR) && bash scripts/select-model.sh
