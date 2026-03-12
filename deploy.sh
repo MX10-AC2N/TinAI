@@ -86,7 +86,7 @@ else
             ;;
         *)
             printf "\n"
-            exec ./scripts/select-model.sh
+            bash "${SCRIPT_DIR}/scripts/select-model.sh"
             ;;
     esac
 fi
