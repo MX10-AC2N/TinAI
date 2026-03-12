@@ -206,7 +206,7 @@ services:
       - /etc/hostname:/host/etc/hostname:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      LLAMA_HOST: tinai-llama
+      LLAMA_HOST: llama
       LLAMA_PORT: "8080"
     depends_on:
       - tinai
