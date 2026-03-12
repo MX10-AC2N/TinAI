@@ -4,7 +4,7 @@ TinAI Monitor API — serveur HTTP minimaliste
 Expose /api/system, /api/containers, /api/logs
 Tourne dans le conteneur monitoring, accède au docker.sock
 """
-import json, os, time, subprocess
+import json, os, subprocess
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.request import urlopen, Request
 from urllib.error import URLError
@@ -16,6 +16,28 @@ LLAMA_PORT  = os.environ.get('LLAMA_PORT', '8080')
 LOG_CONTAINER = 'tinai-llama'
 LOG_LINES = 60
 
+
+# ── Cache CPU (lecture non-bloquante) ────────────────────────────
+_cpu_cache = {'idle': 0, 'total': 0, 'pct': 0.0}
+
+def read_cpu_stat():
+    try:
+        with open('/host/proc/stat') as f:
+            cpu = f.readline().split()
+        idle  = int(cpu[4])
+        total = sum(int(x) for x in cpu[1:])
+        return idle, total
+    except Exception:
+        return 0, 1
+
+def get_cpu_pct():
+    global _cpu_cache
+    idle2, total2 = read_cpu_stat()
+    idle1, total1 = _cpu_cache['idle'], _cpu_cache['total']
+    _cpu_cache['idle'], _cpu_cache['total'] = idle2, total2
+    if total2 - total1 > 0:
+        _cpu_cache['pct'] = round(100.0 * (1 - (idle2-idle1)/(total2-total1)), 1)
+    return _cpu_cache['pct']
 
 # ── Docker socket client ──────────────────────────────────────────
 def docker_get(path):
@@ -75,21 +97,12 @@ def get_logs():
 
 
 def get_system():
-    # CPU (lecture /proc/stat)
+    # CPU (non-bloquant — delta entre deux appels)
     try:
-        with open('/host/proc/stat') as f:
-            cpu = f.readline().split()
-        idle1 = int(cpu[4])
-        total1 = sum(int(x) for x in cpu[1:])
-        time.sleep(0.1)
-        with open('/host/proc/stat') as f:
-            cpu = f.readline().split()
-        idle2 = int(cpu[4])
-        total2 = sum(int(x) for x in cpu[1:])
-        cpu_pct = 100.0 * (1 - (idle2-idle1)/(total2-total1))
+        cpu_pct   = get_cpu_pct()
         cpu_count = os.cpu_count() or 1
     except Exception:
-        cpu_pct, cpu_count = 0, 1
+        cpu_pct, cpu_count = 0.0, 1
 
     # Load average
     try:
