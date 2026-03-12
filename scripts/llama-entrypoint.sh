@@ -21,7 +21,7 @@ ok()   { printf "${G}[llama-entrypoint] ✓ %s${N}\n" "$*"; }
 # ── Modèle présent → démarrage direct ────────────────────────────
 if [ -f "$MODEL_PATH" ]; then
     ok "Modèle trouvé : $MODEL_PATH"
-    exec /usr/local/bin/llama-server "$@"
+    exec /app/llama-server "$@"
 fi
 
 # ── Aucun .gguf dans le volume → instruction claire ───────────────
@@ -47,7 +47,7 @@ if [ "$GGUF_COUNT" -gt 0 ]; then
         [ -n "$NEW" ] && break
     done
     ok "Modèle détecté — démarrage..."
-    exec /usr/local/bin/llama-server "$@"
+    exec /app/llama-server "$@"
 fi
 
 # ── Dossier models/ vide ─────────────────────────────────────────
@@ -86,4 +86,4 @@ while true; do
     log "Toujours en attente... (lance ./scripts/select-model.sh)"
 done
 
-exec /usr/local/bin/llama-server "$@"
+exec /app/llama-server "$@"
