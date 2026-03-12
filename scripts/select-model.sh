@@ -26,6 +26,15 @@ check_deps() {
     else
         die "python3 ou jq requis pour parser l'API HuggingFace"
     fi
+
+    # Test connectivité HuggingFace au démarrage
+    printf "${C}→ Vérification de la connectivité...${N} "
+    if curl -sf --max-time 8 "https://huggingface.co" -o /dev/null 2>&1; then
+        printf "${G}OK${N}\n"
+    else
+        printf "${R}ÉCHEC${N}\n"
+        die "HuggingFace inaccessible — vérifie la connexion internet de cette machine"
+    fi
 }
 
 # ── Catalogue de repos GGUF connus ────────────────────────────────
@@ -160,9 +169,35 @@ list_gguf_files() {
     HF_REPO="$1"
     API_URL="https://huggingface.co/api/models/${HF_REPO}"
 
-    info "Interrogation de l'API HuggingFace..."
-    RESPONSE=$(curl -sf --max-time 20 "$API_URL" 2>/dev/null) \
-        || die "Impossible de joindre l'API HuggingFace\nVérifier la connexion et le repo : ${HF_REPO}"
+    # Spinner pendant l'appel API
+    printf "${C}→ Interrogation de l'API HuggingFace...${N} "
+    SPIN='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    i=0
+    curl -sf --max-time 30 "$API_URL" -o /tmp/hf_response.json &
+    CURL_PID=$!
+    while kill -0 $CURL_PID 2>/dev/null; do
+        i=$(( (i+1) % 10 ))
+        printf "\r${C}→ Interrogation de l'API HuggingFace... %s${N}" "$(echo "$SPIN" | cut -c$((i+1)))"
+        sleep 0.1
+    done
+    wait $CURL_PID
+    CURL_EXIT=$?
+    printf "\r${C}→ Interrogation de l'API HuggingFace... ${G}done${N}\n"
+
+    if [ $CURL_EXIT -ne 0 ] || [ ! -s /tmp/hf_response.json ]; then
+        printf "${R}✗ Impossible de joindre l'API HuggingFace${N}\n"
+        printf "  URL testée : %s\n" "$API_URL"
+        printf "  Test réseau : "
+        if curl -sf --max-time 5 "https://huggingface.co" -o /dev/null; then
+            printf "${G}HuggingFace accessible${N}\n"
+            printf "  Le repo '%s' existe-t-il ?\n" "$HF_REPO"
+        else
+            printf "${R}HuggingFace inaccessible${N} — vérifie ta connexion\n"
+        fi
+        exit 1
+    fi
+    RESPONSE=$(cat /tmp/hf_response.json)
+    rm -f /tmp/hf_response.json
 
     if [ "$PARSER" = "python3" ]; then
         # Retourne : "FNAME|SIZE_BYTES|SIZE_FMT|RAM_FMT|ORDER"
