@@ -44,10 +44,9 @@ git clone https://github.com/MX10-AC2N/TinAI.git && cd TinAI
 cp .env.example .env && nano .env
 
 # 3. Déployer
-make                   # sans Open WebUI
-make webui             # avec Open WebUI
-make monitoring        # avec Netdata (monitoring temps réel)
-make webui-monitoring  # avec Open WebUI et Netdata
+make              # sans Open WebUI
+make webui        # avec Open WebUI
+make monitoring   # avec dashboard monitoring
 ```
 
 > 💡 **Sélection du modèle automatique** — si aucun modèle n'est présent dans `./models/`,
@@ -64,6 +63,7 @@ make webui-monitoring  # avec Open WebUI et Netdata
 | 🌐 **Open WebUI** | http://localhost:3000 | Interface de chat *(optionnel)* |
 | 🤖 **OpenFang** | http://localhost:4200 | Dashboard agents IA autonomes |
 | ⚡ **llama-server** | http://localhost:8081 | API OpenAI-compatible |
+| 📊 **Monitor** | http://localhost:9000 | Dashboard monitoring *(optionnel)* |
 
 ---
 
@@ -79,7 +79,7 @@ cp .env.example .env && nano .env
 # 3. Deploy
 make              # without Open WebUI
 make webui        # with Open WebUI
-make monitoring   # with Netdata (real-time monitoring)
+make monitoring   # with monitoring dashboard
 ```
 
 > 💡 **Automatic model selection** — if no model is present in `./models/`, an interactive
@@ -212,22 +212,23 @@ Installe l'extension **Continue** puis ajoute dans `~/.continue/config.json` :
 ## 📊 Monitoring (optionnel)
 
 ```bash
-make monitoring          # démarre Netdata avec la stack
-make monitoring-down     # arrête tout y compris Netdata
+make monitoring          # démarre le dashboard avec la stack
+make monitoring-down     # arrête tout y compris le monitoring
 ```
 
-Netdata est disponible sur **http://localhost:19999** — zéro configuration requise.  
-Il détecte automatiquement les conteneurs Docker et affiche :
+Le dashboard est disponible sur **http://&lt;ip-zimaboard&gt;:9000** — aucune configuration requise.
 
-- CPU, RAM, disque, réseau en temps réel
-- Métriques par conteneur (`tinai-llama`, `tinai`, `tinai-webui`)
-- Alertes automatiques si un conteneur consomme trop de ressources
+Ce qu'il affiche en temps réel (rafraîchissement toutes les 5s) :
 
-> 💡 Netdata peut aussi être activé indépendamment sur une stack déjà démarrée :
+- **CPU, RAM, disque** de la machine hôte avec barres de progression
+- **État des conteneurs** (`tinai-llama`, `tinai`, `tinai-webui`) avec consommation mémoire
+- **Statut llama-server** — modèle chargé, slots libres / en cours
+- **Logs en direct** du conteneur `tinai-llama`
+
+> 💡 Peut aussi être activé sur une stack déjà démarrée :
 > ```bash
 > docker compose --profile monitoring up -d
 > ```
-
 ---
 
 ## 🗂️ Utiliser son propre modèle / Bring your own model
