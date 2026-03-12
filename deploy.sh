@@ -6,6 +6,10 @@
 # ══════════════════════════════════════════════════════════════════
 set -eu
 
+# ── Auto-fix permissions (au cas où git n'a pas préservé +x) ──────
+chmod +x "$(dirname "$0")/deploy.sh"          "$(dirname "$0")"/scripts/*.sh 2>/dev/null || true
+
+
 R='\033[0;31m'; G='\033[0;32m'; Y='\033[0;33m'
 C='\033[0;36m'; W='\033[1;37m'; N='\033[0m'
 
