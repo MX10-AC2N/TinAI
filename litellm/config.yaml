@@ -1,0 +1,25 @@
+# =============================================
+# LiteLLM – Configuration TinAI
+# =============================================
+
+model_list:
+  # Modèle local via llama.cpp
+  - model_name: llama-local
+    litellm_params:
+      model: openai/llama-local
+      api_base: http://llama:8080/v1
+      api_key: sk-tinai
+
+  # Alias plus joli pour tes apps
+  - model_name: qwen3-1.7b
+    litellm_params:
+      model: openai/qwen3-1.7b
+      api_base: http://llama:8080/v1
+      api_key: sk-tinai
+
+# Tu peux ajouter ici Groq, OpenAI, Anthropic, etc. plus tard
+# Exemple :
+#  - model_name: groq-llama
+#    litellm_params:
+#      model: groq/llama3-70b-8192
+#      api_key: os.environ/GROQ_API_KEY
