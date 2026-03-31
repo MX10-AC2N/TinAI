@@ -45,7 +45,7 @@ if [ $# -eq 0 ]; then
             3>&1 1>&2 2>&3)
 
         for item in $CHOICES; do
-            PROFILES="$PROFILES --profile $(echo "$item" | tr -d '"")"
+            PROFILES="$PROFILES --profile $(echo "$item" | tr -d '"')"
         done
 
         [ -z "$PROFILES" ] && {
