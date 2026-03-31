@@ -10,13 +10,13 @@ chmod +x "$(dirname "$0")/deploy.sh" "$(dirname "$0")"/scripts/*.sh 2>/dev/null 
 R='\033[0;31m'; G='\033[0;32m'; Y='\033[0;33m'
 C='\033[0;36m'; W='\033[1;37m'; N='\033[0m'
 
-SCRIPT_DIR="\( (cd " \)(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-ok()   { printf "\( {G}✓ %s \){N}\n" "$*"; }
-info() { printf "\( {C}→ %s \){N}\n" "$*"; }
-warn() { printf "\( {Y}⚠ %s \){N}\n" "$*"; }
-die()  { printf "\( {R}✗ %s \){N}\n" "$*" >&2; exit 1; }
+ok()   { printf "${G}✓ %s${N}\n" "$*"; }
+info() { printf "${C}→ %s${N}\n" "$*"; }
+warn() { printf "${Y}⚠ %s${N}\n" "$*"; }
+die()  { printf "${R}✗ %s${N}\n" "$*" >&2; exit 1; }
 
 # Prérequis
 command -v docker >/dev/null 2>&1 || die "docker non trouvé"
@@ -60,12 +60,12 @@ if [ $# -eq 0 ]; then
     # Conversion en --profile
     for item in $SELECTED; do
         case "$item" in
-            *llama*)      PROFILES="$PROFILES --profile llama" ;;
-            *openfang*)   PROFILES="$PROFILES --profile openfang" ;;
-            *litellm*)    PROFILES="$PROFILES --profile litellm" ;;
-            *hermes*)     PROFILES="$PROFILES --profile hermes" ;;
-            *webui*)      PROFILES="$PROFILES --profile webui" ;;
-            *monitoring*) PROFILES="$PROFILES --profile monitoring" ;;
+            *llama*)      PROFILES="$PROFILES --profile llama" ;; 
+            *openfang*)   PROFILES="$PROFILES --profile openfang" ;; 
+            *litellm*)    PROFILES="$PROFILES --profile litellm" ;; 
+            *hermes*)     PROFILES="$PROFILES --profile hermes" ;; 
+            *webui*)      PROFILES="$PROFILES --profile webui" ;; 
+            *monitoring*) PROFILES="$PROFILES --profile monitoring" ;; 
         esac
     done
 fi
@@ -73,23 +73,23 @@ fi
 # Parsing --profile en ligne de commande (rétro-compatibilité)
 if [ -z "$PROFILES" ]; then
     PROFILES=""; SKIP_NEXT=0
-    for arg in "$@"; do
+    for arg in "${@}"; do
         if [ "$SKIP_NEXT" = 1 ]; then
             PROFILES="$PROFILES --profile $arg"
             SKIP_NEXT=0
         else
             case "$arg" in
-                --profile=*) PROFILES="$PROFILES --profile ${arg#--profile=}" ;;
-                --profile)   SKIP_NEXT=1 ;;
+                --profile=*) PROFILES="$PROFILES --profile ${arg#--profile=}" ;; 
+                --profile)   SKIP_NEXT=1 ;; 
             esac
         fi
     done
 fi
 
 # Banner
-printf "\n\( {W}╔══════════════════════════════════════════════════╗ \){N}\n"
-printf "\( {W}║           TinAI – Déploiement gum v8            ║ \){N}\n"
-printf "\( {W}╚══════════════════════════════════════════════════╝ \){N}\n\n"
+printf "\n${W}╔══════════════════════════════════════════════════╗${N}\n"
+printf "${W}║           TinAI – Déploiement gum v8            ║${N}\n"
+printf "${W}╚══════════════════════════════════════════════════╝${N}\n\n"
 
 info "Démarrage des services sélectionnés..."
 # shellcheck disable=SC2086
@@ -110,7 +110,7 @@ fi
 
 # Sous-menu modèle llama.cpp
 if echo "$PROFILES" | grep -q "llama"; then
-    printf "\n\( {C}=== Configuration llama.cpp === \){N}\n"
+    printf "\n${C}=== Configuration llama.cpp ===${N}\n"
     if gum confirm "Voulez-vous sélectionner/télécharger un modèle maintenant ?"; then
         bash "${SCRIPT_DIR}/scripts/select-model.sh"
     else
@@ -120,11 +120,12 @@ fi
 
 # Wizard Hermès
 if echo "$PROFILES" | grep -q "hermes"; then
-    printf "\n\( {C}=== Configuration Hermès Agent === \){N}\n"
-    HERMES_DATA="\( {SCRIPT_DIR}/ \)(grep "^HERMES_DATA_DIR=" .env | cut -d'=' -f2 | tr -d '"')"
+    printf "\n${C}=== Configuration Hermès Agent ===${N}\n"
+    HERMES_DATA="$(grep "^HERMES_DATA_DIR=" .env | cut -d'=' -f2 | tr -d '"')"
     mkdir -p "$HERMES_DATA"
     if [ ! -f "$HERMES_DATA/.env" ]; then
-        if gum confirm "C'est la première fois que tu lances Hermès.\nVoulez-vous lancer le setup wizard maintenant ?"; then
+        if gum confirm "C'est la première fois que tu lances Hermès.
+Voulez-vous lancer le setup wizard maintenant ?"; then
             info "Lancement du setup wizard Hermès..."
             docker run -it --rm -v "$HERMES_DATA:/opt/data" nousresearch/hermes-agent
             ok "Setup Hermès terminé !"
@@ -134,5 +135,5 @@ if echo "$PROFILES" | grep -q "hermes"; then
     fi
 fi
 
-printf "\n\( {G}🎉 TinAI est prêt ! \){N}\n"
+printf "\n${G}🎉 TinAI est prêt !${N}\n"
 printf "Services lancés : ${PROFILES:---aucun--}\n"
