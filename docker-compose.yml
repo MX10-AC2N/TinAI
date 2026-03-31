@@ -1,25 +1,17 @@
-# ══════════════════════════════════════════════════════════════════
-#  TinAI v7 – docker-compose.yml (tous les services optionnels)
-# ══════════════════════════════════════════════════════════════════
-
 services:
 
-  # ── llama.cpp (optionnel – profil "llama")
+  # ── llama.cpp (optionnel)
   llama:
-    profiles: ["llama"]                    # ← NOUVEAU
-    image: ${LLAMA_IMAGE:-ghcr.io/ggml-org/llama.cpp:server}
+    profiles: ["llama"]
+    image: ghcr.io/ggml-org/llama.cpp:server
     container_name: tinai-llama
     restart: unless-stopped
-
     ports:
       - "${PORT_LLAMA:-8081}:8080"
-
     volumes:
       - ${MODELS_DIR:-./models}:/models
       - ./scripts/llama-entrypoint.sh:/llama-entrypoint.sh
-
     entrypoint: ["sh", "/llama-entrypoint.sh"]
-
     environment:
       LLAMA_HF_REPO:          ${LLAMA_HF_REPO:-Qwen/Qwen3-1.7B-GGUF}
       LLAMA_HF_FILE:          ${LLAMA_HF_FILE:-Qwen3-1.7B-Q5_K_M.gguf}
@@ -32,100 +24,100 @@ services:
       LLAMA_ARG_N_GPU_LAYERS: ${LLAMA_GPU_LAYERS:-0}
       LLAMA_ARG_API_KEY:      ${TINAI_API_KEY:-sk-tinai}
       LLAMA_ARG_ALIAS:        ${LLAMA_MODEL_ALIAS:-qwen3-1.7b}
-
     mem_limit: ${MEM_LIMIT:-6g}
-    mem_reservation: 2g
-
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       start_period: 120s
-      retries: 5
-
     networks:
       - tinai-net
 
-  # ── OpenFang (optionnel – profil "openfang")
+  # ── OpenFang (optionnel)
   tinai:
-    profiles: ["openfang"]                 # ← NOUVEAU
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: ${TINAI_IMAGE:-tinai:v7}
-
-    container_name: tinai
+    profiles: ["openfang"]
+    build: .
+    image: tinai:v7
+    container_name: tinai-openfang
     restart: unless-stopped
-
-    # depends_on supprimé → OpenFang peut tourner sans llama (utilise des LLM externes)
     ports:
       - "${PORT_OPENFANG:-4200}:4200"
-
     volumes:
       - ${OPENFANG_DATA_DIR:-./data/openfang}:/root/.openfang
-
     environment:
       LLAMA_PORT:          8081
       LLAMA_HOST:          llama
-      OPENFANG_PORT:       4200
       TINAI_API_KEY:       ${TINAI_API_KEY:-sk-tinai}
-      # Providers externes (fonctionnent même sans llama)
       ANTHROPIC_API_KEY:   ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY:      ${OPENAI_API_KEY:-}
       GROQ_API_KEY:        ${GROQ_API_KEY:-}
+    networks:
+      - tinai-net
 
-    mem_limit: 1g
-    mem_reservation: 256m
+  # ── LiteLLM (optionnel)
+  litellm:
+    profiles: ["litellm"]
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: tinai-litellm
+    restart: unless-stopped
+    ports:
+      - "${PORT_LITELLM:-4000}:4000"
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml:ro
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-tinai-litellm}
+    networks:
+      - tinai-net
+    depends_on:
+      llama:
+        condition: service_healthy
 
-    healthcheck:
-      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
-      interval: 10s
-      timeout: 5s
-      start_period: 25s
-      retries: 3
-
+  # ── Hermès Agent (optionnel)
+  hermes:
+    profiles: ["hermes"]
+    image: nousresearch/hermes-agent:latest
+    container_name: tinai-hermes
+    restart: unless-stopped
+    ports:
+      - "${PORT_HERMES:-4201}:8080"
+    volumes:
+      - ${HERMES_DATA_DIR:-./data/hermes}:/opt/data
+    environment:
+      HERMES_LLM_BASE_URL: http://llama:8080/v1
+      HERMES_LLM_API_KEY:  ${TINAI_API_KEY:-sk-tinai}
+    command: gateway run
     networks:
       - tinai-net
 
   # ── Open WebUI (optionnel)
   webui:
     profiles: ["webui"]
-    image: ${WEBUI_IMAGE:-ghcr.io/open-webui/open-webui:main-slim}
+    image: ghcr.io/open-webui/open-webui:main-slim
     container_name: tinai-webui
     restart: unless-stopped
-
     depends_on:
       llama:
-        condition: service_healthy   # ne s’applique que si le profil llama est activé
-
+        condition: service_healthy
     ports:
       - "${PORT_WEBUI:-3000}:8080"
-
     volumes:
       - ${WEBUI_DATA_DIR:-./data/webui}:/app/backend/data
-
     environment:
       OPENAI_API_BASE_URL: http://llama:8080/v1
       OPENAI_API_KEY:      ${TINAI_API_KEY:-sk-tinai}
       WEBUI_SECRET_KEY:    ${WEBUI_SECRET_KEY:-tinai-secret-change-me}
-      WEBUI_AUTH:          ${WEBUI_AUTH:-False}
-
     networks:
       - tinai-net
 
   # ── Monitoring (optionnel)
   monitor:
     profiles: ["monitoring"]
-    build:
-      context: ./monitoring
-      dockerfile: Dockerfile
+    build: ./monitoring
     image: tinai-monitor:latest
     container_name: tinai-monitor
     restart: unless-stopped
-
     ports:
-      - "9000:19999"   # Netdata
-
+      - "9000:19999"
     networks:
       - tinai-net
 
