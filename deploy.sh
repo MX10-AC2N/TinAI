@@ -10,13 +10,13 @@ chmod +x "$(dirname "$0")/deploy.sh" "$(dirname "$0")"/scripts/*.sh 2>/dev/null 
 R='\033[0;31m'; G='\033[0;32m'; Y='\033[0;33m'
 C='\033[0;36m'; W='\033[1;37m'; N='\033[0m'
 
-SCRIPT_DIR="\( (cd " \)(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-ok()   { printf "\( {G}✓ %s \){N}\n" "$*"; }
-info() { printf "\( {C}→ %s \){N}\n" "$*"; }
-warn() { printf "\( {Y}⚠ %s \){N}\n" "$*"; }
-die()  { printf "\( {R}✗ %s \){N}\n" "$*" >&2; exit 1; }
+ok()   { printf "${G}✓ %s${N}\n" "$*"; }
+info() { printf "${C}→ %s${N}\n" "$*"; }
+warn() { printf "${Y}⚠ %s${N}\n" "$*"; }
+die()  { printf "${R}✗ %s${N}\n" "$*" >&2; exit 1; }
 
 # Prérequis
 command -v docker >/dev/null 2>&1 || die "docker non trouvé"
@@ -45,7 +45,7 @@ if [ $# -eq 0 ]; then
             3>&1 1>&2 2>&3)
 
         for item in $CHOICES; do
-            PROFILES="$PROFILES --profile $(echo "$item" | tr -d '"')"
+            PROFILES="$PROFILES --profile $(echo "$item" | tr -d '"")"
         done
 
         [ -z "$PROFILES" ] && {
@@ -57,10 +57,10 @@ if [ $# -eq 0 ]; then
         printf "\n${W}1) llama + OpenFang\n2) Tout\n3) llama seul\n4) OpenFang seul\nChoix : ${N}"
         read -r CHOICE
         case "$CHOICE" in
-            1) PROFILES="--profile llama --profile openfang" ;;
-            2) PROFILES="--profile llama --profile openfang --profile litellm --profile hermes --profile webui --profile monitoring" ;;
-            3) PROFILES="--profile llama" ;;
-            4) PROFILES="--profile openfang" ;;
+            1) PROFILES="--profile llama --profile openfang" ;; 
+            2) PROFILES="--profile llama --profile openfang --profile litellm --profile hermes --profile webui --profile monitoring" ;; 
+            3) PROFILES="--profile llama" ;; 
+            4) PROFILES="--profile openfang" ;; 
             *) die "Choix invalide" ;;
         esac
     fi
@@ -75,17 +75,17 @@ if [ -z "$PROFILES" ]; then
             SKIP_NEXT=0
         else
             case "$arg" in
-                --profile=*) PROFILES="$PROFILES --profile ${arg#--profile=}" ;;
-                --profile)   SKIP_NEXT=1 ;;
+                --profile=*) PROFILES="$PROFILES --profile ${arg#--profile=}" ;; 
+                --profile)   SKIP_NEXT=1 ;; 
             esac
         fi
     done
 fi
 
 # ── Banner ────────────────────────────────────────────────────────
-printf "\n\( {W}╔══════════════════════════════════════════════════╗ \){N}\n"
-printf "\( {W}║           TinAI – Déploiement whiptail v7       ║ \){N}\n"
-printf "\( {W}╚══════════════════════════════════════════════════╝ \){N}\n\n"
+printf "\n${W}╔══════════════════════════════════════════════════╗${N}\n"
+printf "${W}║           TinAI – Déploiement whiptail v7       ║${N}\n"
+printf "${W}╚══════════════════════════════════════════════════╝${N}\n\n"
 
 # ── Déploiement Docker ────────────────────────────────────────────
 info "Démarrage des services sélectionnés..."
@@ -108,7 +108,7 @@ fi
 
 # ── SOUS-MENU MODÈLE llama.cpp (si sélectionné) ───────────────────
 if echo "$PROFILES" | grep -q "llama"; then
-    printf "\n\( {C}=== Configuration llama.cpp === \){N}\n"
+    printf "\n${C}=== Configuration llama.cpp ===${N}\n"
     if command -v whiptail >/dev/null 2>&1; then
         if whiptail --title "Modèle llama.cpp" --yesno "\nVoulez-vous sélectionner/télécharger un modèle maintenant ?" 12 75; then
             bash "${SCRIPT_DIR}/scripts/select-model.sh"
@@ -120,8 +120,8 @@ fi
 
 # ── SETUP WIZARD HERMÈS AGENT (si sélectionné) ───────────────────
 if echo "$PROFILES" | grep -q "hermes"; then
-    printf "\n\( {C}=== Configuration Hermès Agent === \){N}\n"
-    HERMES_DATA="\( {SCRIPT_DIR}/ \)(grep "^HERMES_DATA_DIR=" .env | cut -d'=' -f2 | tr -d '"')"
+    printf "\n${C}=== Configuration Hermès Agent ===${N}\n"
+    HERMES_DATA="$(grep "^HERMES_DATA_DIR=" .env | cut -d'=' -f2 | tr -d '"')"
     mkdir -p "$HERMES_DATA"
 
     # Vérifie si le wizard a déjà été lancé (fichier .env dans le volume)
@@ -130,8 +130,8 @@ if echo "$PROFILES" | grep -q "hermes"; then
             if whiptail --title "Hermès Agent – Setup Wizard" \
                 --yesno "\nC'est la première fois que tu lances Hermès.\n\nVoulez-vous lancer le wizard officiel de Nous Research maintenant ?\n(Il te demandera tes clés API et configurera tout automatiquement)" 14 80; then
                 info "Lancement du setup wizard Hermès (interactif)..."
-                docker run -it --rm \
-                    -v "$HERMES_DATA:/opt/data" \
+                docker run -it --rm \ 
+                    -v "$HERMES_DATA:/opt/data" \ 
                     nousresearch/hermes-agent
                 ok "Setup Hermès terminé !"
             else
@@ -143,7 +143,7 @@ if echo "$PROFILES" | grep -q "hermes"; then
     fi
 fi
 
-printf "\n\( {G}🎉 TinAI est prêt ! \){N}\n"
+printf "\n${G}🎉 TinAI est prêt !${N}\n"
 printf "Services lancés : ${PROFILES:---aucun--}\n"
 printf "\nURLs utiles :\n"
 printf "  • llama.cpp     → http://localhost:${PORT_LLAMA:-8081}\n"
